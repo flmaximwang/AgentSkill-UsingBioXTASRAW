@@ -54,7 +54,8 @@ def read_norm_csv(path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=FMT)
     ap.add_argument("--series-dir", required=True, help="原始 tif 目录")
-    ap.add_argument("--norm-csv", required=True, help="normalization_factors.csv（提供每帧 Transmitted_Beam）")
+    ap.add_argument("--norm-csv", default=None,
+                    help="normalization_factors.csv（提供每帧 Transmitted_Beam）；不给=不做逐帧归一化")
     ap.add_argument("--out", required=True, help="输出 mp4 路径")
     ap.add_argument("--x1", type=int, default=680, help="裁剪区 x 下界（横向）")
     ap.add_argument("--x2", type=int, default=750, help="裁剪区 x 上界（横向）")
@@ -82,16 +83,20 @@ def main():
     if args.limit:
         files = files[:args.limit]
 
-    tb = read_norm_csv(args.norm_csv)
-    tb_med = float(np.median([tb[os.path.splitext(os.path.basename(f))[0]]
-                              for f in files if os.path.splitext(os.path.basename(f))[0] in tb]))
-    factors = []
-    for f in files:
-        stem = os.path.splitext(os.path.basename(f))[0]
-        if stem not in tb:
-            raise SystemExit(f"{stem} 不在 {args.norm_csv} 里")
-        factors.append(1.0 if args.normalize == "off" else tb_med / tb[stem])
-    factors = np.array(factors)
+    if args.norm_csv and args.normalize == "on":
+        tb = read_norm_csv(args.norm_csv)
+        tb_med = float(np.median([tb[os.path.splitext(os.path.basename(f))[0]]
+                                  for f in files if os.path.splitext(os.path.basename(f))[0] in tb]))
+        factors = []
+        for f in files:
+            stem = os.path.splitext(os.path.basename(f))[0]
+            if stem not in tb:
+                raise SystemExit(f"{stem} 不在 {args.norm_csv} 里")
+            factors.append(tb_med / tb[stem])
+        factors = np.array(factors)
+    else:
+        factors = np.ones(len(files))   # 没有监视器数据（或显式关掉）→ 不归一化
+        print("（未提供 --norm-csv 或 --normalize off：不做逐帧归一化，因子全 1）")
     print(f"帧数 {len(files)} | 归一化 {args.normalize} | 因子 1–99%: "
           f"{np.percentile(factors, 1):.4f}–{np.percentile(factors, 99):.4f}（中位 1.0）")
 

@@ -52,11 +52,16 @@ def log(msg):
 
 
 # ----------------------------------------------------------------- RAW 设置
-def make_settings(cfg, atsas_dir=None):
+def make_settings(cfg, atsas_dir=None, header_normalization=True):
     st = raw.load_settings(cfg)
-    st.set('ImageHdrFormat', 'BL19U2, SSRF')      # 认 <帧名>.txt 作为 header
-    st.set('EnableNormalization', True)           # 打开图像归一化
-    st.set('NormalizationList', [['/', 'Transmitted_Beam']])  # 除以 header 里的 Transmitted_Beam
+    if header_normalization:
+        st.set('ImageHdrFormat', 'BL19U2, SSRF')  # 认 <帧名>.txt 作为 header
+        st.set('EnableNormalization', True)       # 打开图像归一化
+        st.set('NormalizationList', [['/', 'Transmitted_Beam']])  # 除以 header 里的 Transmitted_Beam
+    else:
+        # 该系列没有逐帧 txt（线站没给监视器/日志）→ 关掉，避免 RAW 去找不存在的 <帧名>.txt
+        st.set('ImageHdrFormat', 'None')
+        st.set('EnableNormalization', False)
     if atsas_dir:
         st.set('ATSASDir', atsas_dir)
     return st
@@ -433,6 +438,8 @@ def main():
     ap.add_argument("--n-models", type=int, default=4, help="DAMMIF 模型数")
     ap.add_argument("--symmetry", default="P1", help="DAMMIF 对称性")
     ap.add_argument("--atsas-dir", default=None, help="ATSAS bin 目录（装了就传，RAW 的 GNOM/DAMMIF 需要）")
+    ap.add_argument("--no-header-normalization", action="store_true",
+                    help="该系列没有逐帧 BL19U2 header txt 时用：不启用逐帧归一化（ImageHdrFormat=None）")
     ap.add_argument("--limit", type=int, default=None, help="只用前 N 帧（试跑）")
     args = ap.parse_args()
 
@@ -452,7 +459,8 @@ def main():
 
     log(f"输入 {len(files)} 帧 ← {src}")
     log(f"输出 {out}（prefix={prefix}）| steps={steps}")
-    st = make_settings(args.cfg, args.atsas_dir)
+    st = make_settings(args.cfg, args.atsas_dir,
+                       header_normalization=not args.no_header_normalization)
     log(f"settings: ImageHdrFormat={st.get('ImageHdrFormat')} EnableNormalization={st.get('EnableNormalization')} "
         f"NormalizationList={st.get('NormalizationList')} ATSASDir={st.get('ATSASDir')}")
 
