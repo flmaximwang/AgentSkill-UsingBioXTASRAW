@@ -1,6 +1,6 @@
 ---
 name: process-sec-saxs-series
-description: "处理 SEC-SAXS 连续采集的系列数据（RAW 的 Series）：读色谱图 → 定 buffer/sample 帧区间 → 逐帧扣减 → 用 Rg/MW 平台判据定哪一段是单一物种 → 送 Profiles 成一条曲线。SEC 数据不能用绝对校准/I0 标样定浓度，MW 只能走 Vc/Vp。不做基线校正（转 correct-sec-saxs-baseline），不做 SVD/EFA 分解。"
+description: "处理 SEC-SAXS 系列（连续洗脱帧）→Rg/MW 平台判据与 MW(Vc/Vp) 成一条曲线：色谱图→buffer/sample 区→扣减→送 Profiles。用于「一千多帧怎么变成一条曲线」「Auto 选的 buffer 能信吗」「峰上 Rg 随帧号不平、该取哪一段」「SEC 的分子量怎么算」「峰前小峰要不要算进样品」；SEC 不能用 I0 标样/绝对校准定浓度。不做基线校正（转 correct-sec-saxs-baseline），不做 SVD/EFA 分解。"
 source_book: 《利用BioXTAS RAW程序处理SEC-SAXS数据》· 刘广峰（公众号「生物小角」）· 2024-04-28 ；BioXTAS RAW 官方文档 *Basic SEC-SAXS processing*（v2.4.1）
 source_chapter: 源A ①–⑮ / 源B 1–22、39–45
 tags: [saxs, bioxtas-raw, sec-saxs, series, chromatography, bl19u2]

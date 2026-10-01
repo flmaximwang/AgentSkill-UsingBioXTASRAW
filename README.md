@@ -36,7 +36,8 @@ skill 总览与引用图：[第一本](books/bioxtas-raw-manual/INDEX.md) · [SE
 | 1（初始） | 第一本 3 个 skill | 78% | 81% | 两人在**同样 4 条**上判错 → 回炉阶段 2 改 description 的可见头 |
 | 2（修后） | 同上 | **96%** | **89%** | 导出格式、`*`/`S_` 符号两条两位都改对 |
 | 3（再挪排除条款） | 同上，8 条子集 | **88%** | **100%** | SEC-SAXS 残留为真歧义（低风险） |
-| 4（升级后跨 skill 边界） | 5 个 skill | 见 `test-results.md` | 见 `test-results.md` | 新增两个 SEC skill 与 `reduce-…` 的边界重测 |
+| 4（升级后跨 skill 边界） | 5 个 skill，20 条 | **90%** | **90%** | SEC 连续帧题由 `reduce-…` 正确转到新 skill；两条一致错误（MW、Rg 平台）→ 再改可见头 |
+| 5–6（子集校验） | 5–6 条 | 80% → **83%** | 80% → **83%** | 残留一条真歧义（"SEC 一千多帧怎么变成曲线"），代价为多一跳，已评估并停止调参 |
 
 细节（含判定口径的调整与理由、残留问题评估）见 [`books/bioxtas-raw-manual/test-results.md`](books/bioxtas-raw-manual/test-results.md) 与 [`books/sec-saxs-series/test-results.md`](books/sec-saxs-series/test-results.md)。
 
