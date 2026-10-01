@@ -1,6 +1,6 @@
 ---
 name: reduce-saxs-frames-to-curves
-description: "把 SAXS 帧还原成 1D 曲线（积分→平均→扣减→存 .dat）；A_/S_/* 自检进度。SEC-SAXS 系列（连续洗脱帧）走 process-sec-saxs-series。用于「这批 tif 怎么变成一条曲线」「交给 ATSAS 导出什么格式」「文件名前的 * 和 S_ 是什么意思、能不能删」「扣减完下游说不能用」；不负责从曲线读 Rg、也不负责判断 Rg 好坏。"
+description: "把 SAXS 帧还原成 1D 曲线（积分→平均→扣减→存 .dat）；SEC 连续洗脱帧不归它（走 process-sec-saxs-series）；A_/S_/* 自检进度。用于「这批 tif 怎么变成一条曲线」「交给 ATSAS 导出什么格式」「文件名前的 * 和 S_ 是什么意思、能不能删」「扣减完下游说不能用」；不负责从曲线读 Rg、也不负责判断 Rg 好坏。"
 source_book: 《BioXTAS RAW程序使用说明》· 刘广峰（公众号「生物小角」）· 2024-04-26
 source_chapter: §4 数据预处理（①–⑩）+ §2 界面
 tags: [saxs, bioxtas-raw, reduction, averaging, buffer-subtraction, bl19u2]

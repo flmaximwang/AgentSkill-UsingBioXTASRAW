@@ -1,6 +1,6 @@
 ---
 name: choose-a-molecular-weight-method
-description: "SEC-SAXS/SAXS 分子量该用哪一法、能不能信：两轴定位（RAW 原生 4 法 vs ATSAS 2 法；浓度依赖 vs 浓度无关）——SEC 峰内浓度未知，只能用浓度无关法（Vc / Vp / Shape&Size / Bayesian）；通则 ~10% 不确定度、不应用 SAXS 定分子量（要 MALS / AUC，最好 SEC-MALS-SAXS），SAXS 的用途是判低聚态；含各法不确定度与失效域、Vc 常数（蛋白 c=0.1231 k=1 / RNA c=0.00934 k=0.808）、Porod 默认密度 0.83 kDa/Å³、结合化学计量（250 vs 270 kDa）判不了。用于「SEC 的分子量怎么算 / 该报哪个」「SAXS 能定分子量吗」「Vc 和 Vp 哪个准」「Bayesian 分子量」「<15–20 kDa 能用 Vc 吗」「蛋白-核酸复合物算 MW」；不负责 SEC 系列怎么切帧（转 process-sec-saxs-series），也不负责曲线 Rg/I(0) 可信度（转 assess-guinier-fit-quality）。"
+description: "分子量六法怎么选、能不能信（SEC 用它判低聚态/单体二聚体）：两轴定位（RAW 原生 4 法 vs ATSAS 2 法；浓度依赖 vs 浓度无关）——SEC 峰内浓度未知，只能用浓度无关法（Vc / Vp / Shape&Size / Bayesian）；通则 ~10% 不确定度、不应用 SAXS 定分子量（要 MALS / AUC，最好 SEC-MALS-SAXS），SAXS 的用途是判低聚态；含各法不确定度与失效域、Vc 常数（蛋白 c=0.1231 k=1 / RNA c=0.00934 k=0.808）、Porod 默认密度 0.83 kDa/Å³、结合化学计量（250 vs 270 kDa）判不了。用于「SEC 的分子量怎么算 / 该报哪个」「SAXS 能定分子量吗」「Vc 和 Vp 哪个准」「Bayesian 分子量」「<15–20 kDa 能用 Vc 吗」「蛋白-核酸复合物算 MW」；不负责 SEC 系列怎么切帧（转 process-sec-saxs-series），也不负责曲线 Rg/I(0) 可信度（转 assess-guinier-fit-quality）。"
 source_book: BioXTAS RAW 官方文档 v2.4.2 · *Molecular weight calculation*（SAXS 方法学，`saxs/saxs_mw.rst`）+ *Molecular weight analysis*（教程，`tutorial/s1_mw.rst`）
 source_chapter: saxs/saxs_mw.rst 全篇 / tutorial/s1_mw.rst 全篇
 tags: [saxs, bioxtas-raw, molecular-weight, sec-saxs, method-selection]
