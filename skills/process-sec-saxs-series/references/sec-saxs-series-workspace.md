@@ -24,8 +24,17 @@
 | **Subtracted** | 扣减缓冲液后的强度 vs 帧号（+ 橙色画出拟校正线） | **漂移性质**、样品区平台、校正效果 |
 | **Baseline Corrected** | 再扣掉基线后的强度 vs 帧号 | 漂移是否消除、是否过校正 |
 
-纵轴可选：总积分强度 / 平均强度 / 某个 q 的强度 / 某个 q 区间的强度。
-**低 q 看聚集体、高 q 看噪声**，切 q 区间是诊断手段而不仅是显示偏好。
+**怎么切纵轴**（RAW 2.4.2 实测；两条等价路径）：
+
+- **Series 面板的 `Plot Controls` 框** → **`Intensity:` 下拉框**，四个选项：
+  `Total Intensity` / `Mean Intensity` / `Intensity at specific q` / `Intensity in q range`。
+  选后两档时，同排右边出现 `q = [起点] to [终点]`（**从当前 q 列表里挑**，不是自由输入；单位 Å⁻¹）。
+  同一框里的 **`Calculated value:` 下拉框**（`Rg` / `MW (Vc)` / `MW (Vp)` / `I0`）决定**右 Y 轴**画哪个逐帧参数。
+- **菜单栏 `View`** → `Series Plot Left Y Axis`（同四个选项）；`View` → `Series Plot Intensity Type` → `Unsubtracted` / `Subtracted` / `Baseline Corrected`（切三档图）。
+- **低 q 看聚集体、高 q 看噪声**，切 q 区间是诊断手段而不仅是显示偏好。
+
+> 控件位置核对自源码：`RAWAnalysis.py` `create_layout()` 的 `intensity_type`（wx.Choice）与 `q_range_start` / `q_range_end`（FloatSpinCtrlList）；
+> 菜单项见 `RAW.py` 的 `viewSECLeft` / `viewSECInt` 子菜单定义。
 
 ## 三、Calc markers
 

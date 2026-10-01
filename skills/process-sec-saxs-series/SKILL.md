@@ -124,7 +124,7 @@ related_skills:
    - 若使用自动载入（"Select" 一个文件名由 RAW 自行展开）→ 只在 cfg 为 BioCAT/MacCHESS 时可用；BL19U2 用不上，改用手选或 `.hdf5`。
 3. **剔端点帧**：检查首帧是否离群（shutter 未及时开启 → 整帧偏弱），BL19U2 上末帧不参与强度校正。
    完成标准：能明确说出"首帧留/剔、末帧留/剔"及其依据（源A ③）。
-4. **读色谱图**：先看总积分强度；必要时切到平均强度或某个 q / q 区间强度以分辨小组分。
+4. **读色谱图**：先看总积分强度；再切到**低 q 区间**强度看峰（Series 面板 `Plot Controls` → `Intensity:` 选 `Intensity in q range`，右边填起止 q；或菜单 `View → Series Plot Left Y Axis`）。
    完成标准：能指出主峰范围、峰前小峰（若存在）、以及峰前后基线是否等高。
 5. **打开 LC Analysis**：Series 面板底部 `LC Analysis`（或右键系列名 → LC Series analysis）；在 Series info 里按样品类型设分子类型（蛋白/RNA）、窗口大小。
 6. **定缓冲液区**：`Buffer → Auto`，然后**人工复核**：放大到基线，确认区间内没有肩部/小峰（1–4 步的观察在此兑现），必要时用上下箭头微调。
