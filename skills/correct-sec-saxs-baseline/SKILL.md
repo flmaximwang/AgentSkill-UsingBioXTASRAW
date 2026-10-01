@@ -142,6 +142,11 @@ related_skills:
 `references/sec-saxs-baseline-api.md`（已核对 `RAWAPI.py` 源码签名的函数清单 + 四条只有读源码才看得出的约束）与
 可执行脚本 `scripts/baseline_correction.py`（argparse，`--help` 里有全部默认值与单位）。
 
+**束流不稳定的三层**（本 skill 只覆盖第 ② 层）：强度起伏（乘性，→ 逐帧通量归一化）/ 平滑漂移（→ Linear·Integral）/
+**分块台阶（每 N 帧整体偏移 → RAW 两套都不适用）**。判型方法与脚本见
+`references/beam-instability-and-step-offsets.md` 与 `scripts/block_step_correction.py`
+（含无 RAW 环境下的桩测试实跑数字）。
+
 ## 相关 skills
 
 - **process-sec-saxs-series** — `depends-on`（本 skill 依赖对方）：样品/缓冲液区必须先选对，校正才有对象；第 1 步的判停会退回去。
