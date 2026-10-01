@@ -135,6 +135,24 @@ python run-raw-tube-pipeline.py --sample-dir <目录> --cfg <日期>.cfg --out-d
 
 完成标准：`summary.json` 里每个节点都有值或明确的失败原因；`profiles/04_guinier/` 的份数 = 表里的区间数。
 
+### Step 2 — 一批样品一起跑 + 汇总（整条稀释序列/整批数据）
+
+```bash
+for d in <Tube-SAXS>/*/; do                       # 3 个并行足够（BIFT 单进程、DENSS Fast 几秒）
+  python run-raw-tube-pipeline.py --sample-dir "$d" --cfg <日期>.cfg \
+    --out-dir <产物根>/$(basename "$d") --model-engine denss --denss-mode Fast
+done
+python summarize-tube-run.py <产物根>      # → <产物根>/_summary/summary.csv + summary.md
+python plot-tube-overview.py <产物根>      # → <产物根>/_summary/overview.png
+```
+
+`summarize-tube-run.py` 只读各目录已产出的 `summary.json` / `tables/*.json` / `tables/*.csv`，
+一行一个样品（31 列：control 缩放因子、contrast、auto-Guinier 的 I0/Rg/q/R²、推荐区间与四条闸门、
+区间 Rg 跨度、IFT 两次的 Dmax/Rg_real/chisq/是否可信、MW Vp·Vc、DENSS 的 chi²/Rg_model/体积），
+并对**编号连续的同名系列**（如 `A5-05-*`）额外加一节稀释检查（I0 与 I0/I0(首)、Rg、是否通过闸门）。
+`plot-tube-overview.py` 出四联图：全部扣减曲线（log-log）/ Kratky / I(0) 柱状 / Rg（auto 与 IFT 对照，绿圈=IFT 可信）。
+两个脚本都**不做任何拟合**，只搬运产物里的数。
+
 ## 复核点（先看这几处，再看数字）
 
 1. `tables/guinier_multi_range.csv`：**Rg 是否随区间漂移**、`chi2_red` 是否≈1、`curvature` 的符号（>0 smile=聚集 / <0 frown=排斥）、
@@ -144,6 +162,9 @@ python run-raw-tube-pipeline.py --sample-dir <目录> --cfg <日期>.cfg --out-d
 3. `tables/ift_summary.csv`：`chisq` 与 `Rg_realspace` 是否和 Guinier 的 Rg 对得上（差 >10% 说明 IFT 的 q 范围或 Dmax 域不对）。
 4. `tables/mw.csv`：Vp 与 Vc 是否一个量级；浓度未知（管式 `.txt` 里 `Concentration` 常是空的）→ 只能用浓度无关法 → `choose-a-molecular-weight-method`。
 5. `models/`：DENSS 看 `chi2`、模型 Rg 与 `support_volume`；DAMMIF 要 ≥4 个模型看 a-score/NSD → `evaluate-a-shape-reconstruction`。
+6. **跨样品一致性（一批数据最有用的判据）**：同一条稀释序列里 **I(0) 应随浓度成比例、Vc-MW 应恒定**——
+   本机实测 `A5-05-1…6`：I0 = 64.1/35.4/19.8/10.4/5.1/2.3（每步≈减半，共 28 倍），而 **Vc-MW 恒定在 18.5–20.9 kDa**，
+   这两条一起说明"同一物种、浓度在变"，比任何单条曲线的 Rg 都可信；反之若 Vc-MW 随稀释漂移，就是浓度/对照出了问题（→ `choose-a-molecular-weight-method`）。
 
 ## 坑（都是实测撞出来的）
 
