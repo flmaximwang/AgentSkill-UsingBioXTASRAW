@@ -1,0 +1,83 @@
+{
+  "skill": "script-raw-with-the-python-api",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我有 30 条曲线要都跑一遍 Guinier 并出一份报告，GUI 要点 30 次，有没有别的办法？",
+      "expected_behavior": "给脚本三段骨架：raw.load_settings(SAXS.cfg) → raw.load_profiles(names) → 循环 raw.auto_guinier(prof, settings=settings) → raw.save_report(...)。说明 GUI 能做的 API 都能做，批量的收益在可复现。必要时提示 auto_guinier 返回 11 元组。",
+      "notes": "正面场景：本 skill 最典型的批量诉求（verified N8 的 V2 新问题）。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "RAWAPI 里 auto_guinier 到底返回几个值、顺序是什么？我解包老报错",
+      "expected_behavior": "答返回 11 元组 (rg, i0, rg_err, i0_err, qmin, qmax, qrg_min, qrg_max, idx_min, idx_max, r_sq)；指出官方 API 参考正文是空壳、这类签名只能从示例脚本（ex_analyze_profile）核、以实测为准；建议先跑最小样例解包。",
+      "notes": "正面场景：返回元组顺序是本 skill 的独家知识（文档空壳）。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "想用脚本把 SEC-SAXS 那条 series 的 buffer 和 sample 区自动找出来并扣减，怎么写？",
+      "expected_behavior": "给序列：load_series(...)[0] 或 profiles_to_series(profiles) → find_buffer_range(series) 得 (success,start,end) → set_buffer_range(series, [[start,end]]) → find_sample_range → set_sample_range → save_series。提醒可先 validate_buffer_range/validate_sample_range；无 GUI 时 EFA 区间要自己给。",
+      "notes": "正面场景：SEC 全流程脚本化（ex_sec_saxs）。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "服务器上没有界面，我想在 headless 环境跑一次 SVD 和 EFA",
+      "expected_behavior": "给入口：raw.svd(series) 返回 (svd_s, svd_U, svd_V)；raw.efa(series, efa_ranges) 返回 4 元组，efa_ranges 形如 [[149,197],[164,321],[320,364]]。强调无 GUI 时 EFA/REGALS 不替你选区间，分量区间必须自己给（判据转 deconvolve-overlapping-elution-peaks）。",
+      "notes": "正面场景：headless + 分解（API 的能力缺口）。"
+    },
+    {
+      "id": "should-trigger-05",
+      "type": "should_trigger",
+      "prompt": "怎么把一批 tif 用脚本积分成曲线再平均扣减？python 里怎么调",
+      "expected_behavior": "给 ex_batch_profile 的流程：load_and_integrate_images(files, settings) 得 (profiles, imgs) → average(profiles) → subtract([sam_avg], buf_avg)[0] → save_profile(...)；可加 cormap 检验相似性。强调必须先 load_settings（图像积分依赖校准/掩膜）。",
+      "notes": "正面场景：批量还原（ex_batch_profile）。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "Guinier 拟合该取哪些点？Rg 值信不信得过要看什么？",
+      "expected_behavior": "走 assess-guinier-fit-quality（取点判据与判读，本 skill 只给脚本入口不给判据）。",
+      "notes": "诱饵类型：判据 vs 入口。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "SEC 那一千多帧，怎么肉眼判断哪一段是缓冲液、哪一段是一个物种？",
+      "expected_behavior": "走 process-sec-saxs-series（LC Analysis 区间与平台判据）；本 skill 只把选好的区间落成 set_buffer_range/set_sample_range 参数。",
+      "notes": "诱饵类型：区间判断属 GUI 判读 skill。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "how do I open the SVD window in RAW? 菜单在哪",
+      "expected_behavior": "纯界面/安装查询：按数据形态作答或指向 reference，不启动脚本流水线。",
+      "notes": "诱饵类型：界面巡览属信息检索。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我不确定 mw_vp 和 mw_vc 各返回几个东西，直接取第一个值行不行？",
+      "expected_behavior": "留在本 skill：mw_vp 返回 (mw_vp, pvol_cor, pvol, vp_qmax)，mw_vc 返回 (mw_vc, vcor, mw_err, vc_qmax)；示例里确实取 [0] 作为 MW。但强调返回顺序只能从示例核、以实测为准，未在示例出现的用法不做承诺。",
+      "notes": "边界：多值返回的取用（文档空壳风险）。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "脚本里我做完了基线校正，然后想取样品曲线，为什么拿到的还是没校正的？",
+      "expected_behavior": "指出 profile_type 没换：序列数据要声明类型，扣减用 'sub'、基线校正后用 'baseline'；不写默认为未扣减/未校正。set_sample_range/getSASM/getAllSASMs/getIntI 等都要带 profile_type='baseline'。",
+      "notes": "边界：profile_type 取值错误（静默拿错曲线）。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "我在自己机器上 pip install bioxtasraw 装不上，是不是包名写错了？",
+      "expected_behavior": "答 bioxtasraw 不在 PyPI，必须源码安装：git clone --branch v2.4.2 … && cd bioxtasraw && pip install .；装完会生成 bioxtas_raw 命令可直接起 GUI。",
+      "notes": "边界：安装入口与命令（verified N8 边界必写）。"
+    }
+  ]
+}

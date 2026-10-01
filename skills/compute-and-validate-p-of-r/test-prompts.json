@@ -1,0 +1,76 @@
+{
+  "skill": "compute-and-validate-p-of-r",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我的 P(r) 末端被压得直直地掉到零，是不是 Dmax 取小了？",
+      "expected_behavior": "答'是（陡降 = Dmax 低估）'并给动作：按 Dmax 八步——先把 Dmax 设成初始值 2–3 倍 → 关掉 force-to-zero → 看 P(r) 在哪自然落到零 → 设到该点 → 重新打开 force-to-zero。补判据：到零后绕零振荡 = 高估，平滑趋零 = 合适；并提醒 Dmax 不确定度 ≥5%（有时 ~10%），不要报虚假精度。",
+      "notes": "正面场景：本 skill 的招牌问题（Dmax 低估→陡降）。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "同一份数据用 GNOM 和 BIFT 算 P(r)，Dmax 差了十几个埃，哪个对？",
+      "expected_behavior": "答'都落在不确定度内、互为 sanity check'：Dmax 绝不可能优于 5%、有时接近 10%，两法差十几个埃属正常；说明三法分工——GNOM 出 .out 兼容 DAMMIF/ATSAS，BIFT/DIFT 出 .ift 兼容 DENSS 但不兼容 DAMMIF；选法按下游程序而非精度。",
+      "notes": "正面场景：三法差异 + 不确定度 + 按下游选法。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "RAW 里怎么跑 GNOM / 做距离分布分析？P(r) 在哪个面板看？",
+      "expected_behavior": "给操作：Profiles 列表右击曲线 → IFT (GNOM)（需装 ATSAS；菜单没有就去 Options→Advanced Options 的 ATSAS 设置手动指路）→ 右侧 P(r)/数据-拟合线/残差三面板 → 起始 q 对齐 Guinier → Auto Dmax 只是起点 → 按八步定 Dmax → 看 Total Estimate（至少 REASONABLE）→ 存 .out。",
+      "notes": "正面场景：本 skill 的入口操作。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我要用 P(r) 跑 DENSS 电子密度重建，还要不要像 DAMMIF 那样把 q 截断到 8/Rg？",
+      "expected_behavior": "答'不要'：截断（max q = 8/Rg 或 0.25–0.30 1/Å 取小者）只对 DAMMIF/N 珠模型适用；DENSS 要用全 q 范围，喂全 q 的 .ift 或 _full.out，别用被截断的 .out（官方例：截断把 q_max 0.283 降到 0.238）。",
+      "notes": "正面场景：截断规则的方向性（教训来自 ce13）。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "Guinier 窗口里 n_min 显示 11，怎么调才能读准 lysozyme 的 Rg？",
+      "expected_behavior": "走 assess-guinier-fit-quality（低 q 取点与 q_min·Rg/q_max·Rg 判据）；本 skill 只从'已有可信 Guinier'之后接手。",
+      "notes": "诱饵类型：同一条流水线上游一步，触发词是 n_min/取点。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "DAMMIF 跑出 15 个模型剔了 4 个、平均 NSD=0.8，这个重建能用吗？",
+      "expected_behavior": "走 evaluate-a-shape-reconstruction（重建质量判据：NSD、a-score、χ²、聚类、体积估 MW）；本 skill 只到产出并验证 P(r)/.out/.ift。",
+      "notes": "诱饵类型：P(r) 的下游一步，触发词是重建/NSD。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "Rg 的单位到底是 Å 还是 nm？我读出来差了十倍",
+      "expected_behavior": "走 assess-guinier-fit-quality（单位 = 1/q 的判据）或术语表；不是 IFT/Dmax 问题。",
+      "notes": "诱饵类型：Rg 相关但属取点/单位判读。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我的 P(r) 在 r=0 附近是负的，这正常吗？",
+      "expected_behavior": "留在本 skill：一般不正常（P(0)=P(Dmax)=0 是硬判据），提示数据可能有问题；但给出例外——膜蛋白被脂/去污剂包封（如 lipid nanodisc）时脂/去污剂电子密度低于缓冲液，会出现特征性负 dip，此时该判据不成立。",
+      "notes": "边界：P(r) 恒正/端点为零判据的例外（膜蛋白）。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "P(r) 怎么调都找不到好 Dmax，越拉越大也不平滑趋零，是不是数据坏了？",
+      "expected_behavior": "留在本 skill 并给诊断：这是坏 P(r) 的两类病理之一。把 Dmax 延伸远超'以为正确'的值——持续为负 = 排斥性粒子间干涉（Rg/I(0) 偏低）；保持略正带长尾 = 聚集（Rg/I(0) 偏大）；小振荡贴零 = 好。并交叉验证：少量聚集在 P(r) 上像柔性，须用 Guinier 与 Kratky 判真实状态；确认坏就别送重建。",
+      "notes": "边界：两类坏 P(r) 病理的分辨动作。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "BIFT 出的那个 .ift 文件，能直接丢给 DAMMIF 跑珠模型吗？",
+      "expected_behavior": "答'不能'：BIFT 输出不兼容 DAMMIF 或其它 ATSAS 程序，但兼容 DENSS 电子密度。要跑 ATSAS 珠模型链，先经 GNOM 生成 .out；本 skill 的选法判据就是'按下游重建程序选'。",
+      "notes": "边界：三法兼容性矩阵的典型坑（ce14）。"
+    }
+  ]
+}

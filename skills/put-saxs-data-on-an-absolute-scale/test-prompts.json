@@ -1,0 +1,83 @@
+{
+  "skill": "put-saxs-data-on-an-absolute-scale",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我的 SAXS 曲线现在还是任意刻度，怎么把它放到绝对刻度上？",
+      "expected_behavior": "按 E 段走：确认标样数据齐备且已平均存盘 → 按可用条件选方法（水 / 玻碳 Simple / 玻碳 Full NIST）→ **先关掉绝对刻度**（Full 法还要清空 Normalization 列表）→ Absolute Scale 面板填标样/厚度/计数器 → Calculate 得常数 → 与基准值核对（水 4 °C≈0.00077 / 玻碳 Simple 1.0 mm≈324 / NIST 1.5 mm+I1/I3≈198）→ 勾选归一化复选框 → 之后不得再改归一化。",
+      "notes": "正面场景：本 skill 的教科书式入口。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "定绝对刻度该用水还是用玻碳？两个有什么区别",
+      "expected_behavior": "答'按可用条件分叉，不按偏好'：有玻碳优先玻碳（比水准）；玻碳内部再按背景/上下游通量是否可靠在 Simple（忽略背景，厚度示例 1.0 mm，常数≈324）与 Full NIST（需可靠上下游通量 I1/I3 与准确背景，厚度示例 1.5 mm，常数≈198）之间选；并说明官方示例中两种玻碳法一致到约 1.5%。",
+      "notes": "正面场景：三法分叉的核心决策。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我按教程算玻碳绝对刻度常数，得到 400 多，是数据坏了吗？",
+      "expected_behavior": "先不要怀疑数据，查两条顺序约束：① 算常数前是否**关掉了绝对刻度**；② 算完之后是否又**改过归一化设置**（含通量/透射）。两者都能得到坏常数。再用基准值核对：玻碳 Simple 1.0 mm 应≈324、NIST 1.5 mm 应≈198；对不上就回查顺序与所选文件（是否带 I1/I3、是否选错文件）。",
+      "notes": "正面场景：V2 预测力题（教程没明说'400 多'这个具体症状）。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "绝对刻度常数已经算好了，我现在还能改归一化或者通量设置吗？",
+      "expected_behavior": "答'不能沿用旧常数'：一旦设好绝对标度常数就不得再改归一化设置（含通量、透射等）；改了就必须**重算**常数，且重算前照样要先关掉绝对刻度。说明后果：不报错，但整条 I(q) 会差一个因子、绝对强度上的 I(0)/浓度跟着错。",
+      "notes": "正面场景：顺序约束 B。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我的 SEC-SAXS 数据能不能也做绝对刻度，顺便定个浓度/分子量？",
+      "expected_behavior": "转 process-sec-saxs-series：SEC 洗脱峰内浓度未知，I(0) 标样比对与绝对校准对 SEC 不准确；SEC 的 MW 只能走 Vc/Vp 等浓度无关法。",
+      "notes": "诱饵类型：把绝对刻度误用到浓度未知的 SEC。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我的标样图上 beamstop 的阴影还在，掩膜到底怎么设才生效？",
+      "expected_behavior": "转 configure-bioxtas-raw-for-a-dataset：这是标样图像本身的掩膜/定心/归一化设置问题（配置就绪），不是绝对刻度常数的问题。",
+      "notes": "诱饵类型：配置链的前一环，位置相邻易混。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "我这个蛋白该报哪个分子量？用 Vc 还是绝对刻度法算出来的那个？",
+      "expected_behavior": "转 choose-a-molecular-weight-method（MW 方法选择）：本 skill 只负责把强度放上绝对刻度，不决定报哪个 MW。",
+      "notes": "诱饵类型：同领域的相邻决策点。"
+    },
+    {
+      "id": "should-not-trigger-04",
+      "type": "should_not_trigger",
+      "prompt": "Guinier 拟合出来的 Rg 是 32 Å，这个值可信吗？",
+      "expected_behavior": "转 assess-guinier-fit-quality（取点与判读），与绝对刻度无关。",
+      "notes": "诱饵类型：下游判读。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我有玻碳数据，但背景没测准，上下游通量也不是很可靠，还能走 Full NIST 吗？",
+      "expected_behavior": "留在本 skill 但改走 Simple：Full(NIST) 的前提是'所有测量都有可靠的上/下游通量、且背景测量准确'；条件不满足时硬上 Full 只会得到比 Simple 更不可信的常数。用 Simple（忽略背景、厚度示例 1.0 mm），并如实说明精度略低。",
+      "notes": "边界：考察是否按可用条件（而非'哪个更准'）选法。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "Full NIST 法点 Calculate 前，一定要把 Normalization 面板清空吗？我那里有一些条目也没关系吧",
+      "expected_behavior": "答'要清空'：Full 法的全部归一化（含通量、透射等）都经 Absolute Scale 面板完成，Normalization 面板不应留任何条目（除非在做常数 pedestal 扣除）。这是 Full 法的附加顺序约束；不清空会得到错的常数（示例应近 198）。",
+      "notes": "边界：Full 法特有的前置清理，容易被当成可选项。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "我只有水标样数据，但想要最准的定标，能不能假装用玻碳？",
+      "expected_behavior": "答'不能'：方法必须与手上的数据对应——没有玻碳测量就无法走玻碳法。只有水时用水法（4 °C，期望≈0.00077），并说明它是三法里精度最低的一条、若需要更高精度应补做玻碳标样测量（NIST SRM 3600）。",
+      "notes": "边界：Method-by-availability 原则 —— 不能因为'想要更准'就跳过数据前提。"
+    }
+  ]
+}

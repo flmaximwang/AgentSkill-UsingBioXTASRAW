@@ -1,6 +1,6 @@
 {
   "skill": "configure-bioxtas-raw-for-a-dataset",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "test_cases": [
     {
       "id": "should-trigger-01",
@@ -31,6 +31,20 @@
       "notes": "正面场景：用户拿现象来问配置是否生效。"
     },
     {
+      "id": "should-trigger-05",
+      "type": "should_trigger",
+      "prompt": "这批数据线站没给我 cfg，但我手上有山嵛酸银标样和水的图，能自己造一份配置吗？从哪一步开始",
+      "expected_behavior": "给六步链并按依赖讲顺序（不能跳）：掩膜（宜在水/buffer 图上画；先遮面板缝因为定心的自动寻峰'被遮区域不算数'）→ 定心/几何标定（AgBh 逐环点峰；环号零基）→ 归一化（按透射强度，`/I1` 求值应得 7200.0）→ 绝对刻度（顺序约束：算常数前先关刻度、定完常数不再改归一化）→ MW 标准 → Save Settings 成 .cfg。并指明六步细节见 references/build-a-configuration-file.md。",
+      "notes": "正面场景：本 skill 新增的'配置怎么造出来'能力入口。"
+    },
+    {
+      "id": "should-trigger-06",
+      "type": "should_trigger",
+      "prompt": "我在 RAW 里设归一化，表达式算出来多少才算对？我算的跟教程不一样，是数据有问题吗",
+      "expected_behavior": "给出官方锚点：`/I1`（BioCAT/BL19U2 的 beamstop counter 名）对头文件计数值求值应得 7200.0；对不上说明文件/头格式没设对，而不是数据坏——先按 Load Image 载入头文件、Apply，再核对计数值。",
+      "notes": "正面场景：归一化的官方硬数字判据，把'配置对不对'变成可核对事实。"
+    },
+    {
       "id": "should-not-trigger-01",
       "type": "should_not_trigger",
       "prompt": "BioXTAS RAW 在哪儿下载？Windows 和 Mac 分别装哪个包？",
@@ -52,6 +66,13 @@
       "notes": "诱饵类型：邻近主题（Guinier），但不涉及会话配置。"
     },
     {
+      "id": "should-not-trigger-04",
+      "type": "should_not_trigger",
+      "prompt": "我已经有水标样，怎么把强度放到绝对刻度 cm⁻¹？常数算多少才对",
+      "expected_behavior": "走 put-saxs-data-on-an-absolute-scale：那是绝对刻度本身的方法学（水/玻碳三法分叉、两条顺序约束、基准常数 0.00077/324/198）。本 skill 只在'造 cfg 的六步链'里把绝对刻度作为第 4 步带过并指向它。",
+      "notes": "诱饵类型：相邻决策点（绝对强度刻度），本 skill 不承担三法选择与常数计算。"
+    },
+    {
       "id": "edge-01",
       "type": "edge_case",
       "prompt": "RAW 打开文件夹以后里面是空的，看不到我的 tif，是不是软件坏了？",
@@ -64,6 +85,20 @@
       "prompt": "我这批数据是实验室自己的小角仪采的，没有标样，也没有 cfg，还能处理吗？",
       "expected_behavior": "留在本 skill：这说明'没有可核对的锚点'，正确回答是可以用默认/自建几何做相对比较，但必须明确告知 q 轴绝对值未经验证，并指出从零标定超出本文范围（联系仪器负责人/参考官方文档）。",
       "notes": "边界：数据来源脱离线站，正是作者盲点暴露处——答'不能'或'随便处理'都不对。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "我把 beamstop 遮完了也点了 Save to File 存成 .msk，为什么积分出来阴影还在？",
+      "expected_behavior": "留在本 skill 并给出静默失效的机制：Save to File / Load from file 只在磁盘上写/读 .msk，不改变内存里的掩膜；生效必须按 Set（掩膜随设置保存）；载入 .msk 或 Clear 之后同样要再按 Set。识别信号是曲线在 beamstop 阴影区仍有异常突起/负值。",
+      "notes": "边界：症状是'掩膜没生效'，考察是否把两套保存语义（磁盘文件 vs 内存 Set）讲清楚。"
+    },
+    {
+      "id": "edge-04",
+      "type": "edge_case",
+      "prompt": "造配置时我先算了玻碳的绝对刻度常数，回头又改了归一化设置，这样有问题吗？",
+      "expected_behavior": "指出顺序约束被违反：常数是在当时的归一化设置下标定的，改了归一化（含通量/透射）后必须重算常数，否则所有强度整体偏移且不报错；正确做法是算常数前先关掉绝对刻度、定完常数后冻结归一化。细节转 put-saxs-data-on-an-absolute-scale。",
+      "notes": "边界：'造配置'与'绝对刻度'两个决策点相接处，考察是否按依赖给顺序而不是含糊带过。"
     }
   ]
 }

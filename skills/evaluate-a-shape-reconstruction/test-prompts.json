@@ -1,0 +1,83 @@
+{
+  "skill": "evaluate-a-shape-reconstruction",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "DAMMIF 跑完了，出来一堆数字，我怎么判断这个形状能不能写进文章？",
+      "expected_behavior": "按 E 段走并给出七条判据清单：先看 AMBIMETER a-score（<2.5，最好 <1.5）与平均 NSD（<1.0；<0.6 好、0.6–1.0 fair）→ 被 DAMAVER 剔除的模型数（0–2 个）→ 聚类数（只有 1 个簇）→ 各模型 χ²≈1 → 模型 Rg/Dmax 对上 P(r)（Rg ~5%、Dmax ~10%）→ 体积/1.66 估的 MW 与预期差 <20–25%。强调输出是「模型集 + 评估表」，不是最好看的那张图。",
+      "notes": "正面场景：本 skill 的教科书式入口。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "DAMCLUST 说我这批模型有两个 cluster，是不是说明溶液里真的有两种构象？",
+      "expected_behavior": "答「不能这样解读」：簇不能代表溶液里不同的形状——每个重建拟合的都是各组分散射的平均，单个重建无法只拟合其中一个组分；并给出反向例外：数据极好时（a-score <0.5、平均 NSD <0.5、NSD 标准差 ~0.01）DAMCLUST 会误报多簇（常 >5 个），是模型间差异太小骗了算法。",
+      "notes": "正面场景：材料里最反直觉的一条，且带一个例外。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我的重建结果平均 NSD=0.8，15 个模型剔除了 4 个，DAMCLUST 还说有 2 个簇，这个能用吗？",
+      "expected_behavior": "答「不能」并逐条点出三处不达标：NSD 0.6–1.0 只是 fair（<0.6 才算好）、剔除 >~2/15 是重建不稳定的信号、多簇不是「只有 1 个簇」；说明一般要 NSD <1.0 且其它指标也达标才可信任，而这里是三条同时不达标。建议先查样品单分散性（0.7% 聚集即显著改变珠模型）与 P(r)。",
+      "notes": "正面场景：三判据同时不达标的组合诊断。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "模型 χ² 算出来是 2 左右，是拟合太差还是我的误差估小了？",
+      "expected_behavior": "答：χ² 显著大于 1（1.5–2 或更大）有两个病因，必须看归一化残差的形态分诊——平坦且随机分布在零附近 → 更可能是数据不确定度被低估；有系统性偏离 → 才是拟合质量差。不要只凭 χ² 数值下结论。",
+      "notes": "正面场景：判据 5 的分诊动作。"
+    },
+    {
+      "id": "should-trigger-05",
+      "type": "should_trigger",
+      "prompt": "DENSS 电子密度重建跑完，分辨率该报多少？要跑几个模型？",
+      "expected_behavior": "答：重构数 ≥20（终稿用 Slow）；分辨率取 FSC（Fourier shell correlation）相关首次跨过 0.5 所对应的 Å 数；同时确认各模型的 χ²、Rg、support volume 在最终步都已收敛、残差小，Rg 与预期接近。并提醒 DENSS 要用全 q 的 .ift / _full.out，不要用给 DAMMIF 截断过的 .out。",
+      "notes": "正面场景：DENSS 分支的分辨率读法与数量要求。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我的 P(r) 末端被压得直直地掉到零，是不是 Dmax 取小了？",
+      "expected_behavior": "走 compute-and-validate-p-of-r（Dmax 定法：欠估→陡降、过估→绕零振荡；先解除 force-to-zero 上下扫），本 skill 只在 P(r) 已被判为可信之后接手。",
+      "notes": "诱饵类型：同一条流水线的上游环节，触发词是 P(r)/Dmax。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我算的理论曲线和实验曲线在低 q 差很多，是模型错了吗？",
+      "expected_behavior": "走 fit-a-high-resolution-model-to-data（先看是不是生成的 minimal 曲线——minimal 即使模型相符也常拟合差；应让数据参与计算，即「计算即拟合」）。本 skill 只覆盖把重建对齐到高分辨结构这个可视化步骤。",
+      "notes": "诱饵类型：CRYSOL/PDB2SAS 理论曲线，属相邻 skill 的领域。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "我这个蛋白的低 q 曲线一直往上翘，Guinier 拟合残差是 smile 形，怎么办？",
+      "expected_behavior": "走 assess-guinier-fit-quality（smile = 聚集、frown = 排斥；排除 >3–5 个低 q 点即报警；<1% 聚集已足以毁掉 Dmax 与 3D 重建）。本 skill 依赖那边的低 q 结论，但不负责判 Guinier。",
+      "notes": "诱饵类型：低 q 病理判读，属相邻 skill。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我只有 5 个重建模型，教程里就是这么跑的，够了吗？",
+      "expected_behavior": "答「不够」：5 是教程为省时间用的演示值，官方两处都写珠模型做 10–20 个（推荐 15）、且 >~2/15 被剔除即视为不稳定——样本太小无法做 2σ 剔除与稳定性判断；DENSS 则要求 ≥20 个。终稿还要用 Slow 模式。",
+      "notes": "边界：教程数字 vs 建议数字的张力。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我已经知道这个蛋白是四聚体、有 D2 对称，重建时把对称性填上就够了，对吗？",
+      "expected_behavior": "指出应做对照：已知对称性/各向异性可以指定，但始终建议再做一组 P1 / 无 anisometry 的重建，验证约束没有过度限制形状；若约束组明显更「好看」而对照组散乱，应先怀疑约束把答案写死了。另需说明多电子密度/多亚基体系用 DAMMIF/N 只能有一个 bead 密度。",
+      "notes": "边界：约束是否过度——判据外的对照实验设计。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "CIFSUP 的按钮找不到，是 RAW 装错了吗？",
+      "expected_behavior": "答：CIFSUP 只在 ATSAS ≥3.1.0 提供；更旧的 ATSAS 用功能相近的 SUPCOMB 窗口（Tools → ATSAS → Align (SUPCOMB/CIFSUP)），窗口里 Reference 是被对齐到的、Target 被移动；DENSS 侧的对齐是另一个窗口（Tools → Electron Density (DENSS) Alignment），默认会额外写出 <reference_name>_centered.pdb，要拿它与对齐结果比。",
+      "notes": "边界：版本绑定（CIFSUP 需 ATSAS ≥3.1.0）。"
+    }
+  ]
+}

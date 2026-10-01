@@ -1,0 +1,83 @@
+{
+  "skill": "fit-a-high-resolution-model-to-data",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我算的理论曲线和实验曲线在低 q 差很多，是模型错了吗？",
+      "expected_behavior": "先问是不是 minimal 曲线：若生成时没把实验数据纳入拟合，minimal 曲线即使模型与溶液结构吻合也常拟合差（溶剂/水化层/排除体积难建模，本应作为拟合参数）——正确做法是「计算即拟合」，把数据加进计算再比。再看结果表有没有 Data/Chi²/Prob：空值即说明未拟合。仍差再按症状调参（高长径比 → harmonics，PDB2SAS 的 q 范围不够 → N samples 128→256）。",
+      "notes": "正面场景：本 skill 的核心原则，也是官方点名的失败模式。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "PDB2SAS 算出来的理论曲线，q 只到实验数据的一半就没了，哪里出问题了？",
+      "expected_behavior": "答：不是模型错，是默认 N samples（128）太小——细长蛋白的实空间 voxel size 被迫变大，导致倒空间最大 q 变小。改成 256（用 2 的幂 64/128/256，速度最好；任意偶数也行），或在 Advanced Settings 里显式设 voxel size（会覆盖 N samples）；改后曲线应覆盖实验数据的全 q 范围。",
+      "notes": "正面场景：PDB2SAS 参数的教科书式症状。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我这条是细长的棒状蛋白，拟合怎么都不好，harmonics 要调吗？",
+      "expected_behavior": "答：要。高长径比物体需要更多 harmonics 才能得到准确理论曲线（官方示例直接把 harmonics 设到 100）；球状蛋白（如 GI）应几乎无差别。并提示同时检查 PDB2SAS 侧的 N samples、以及是否真的把数据加进了拟合（看有没有 Chi²）。",
+      "notes": "正面场景：harmonics 参数的适用条件。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "CRYSOL 的结果表里 Data、Chi²、Prob 这三栏是空的，是程序坏了吗？",
+      "expected_behavior": "答：不是。这些字段只在模型被拟合到数据时才有——空值说明这次算的是 minimal 理论曲线，数据没参与拟合。把实验数据加进 Experimental data 并勾选后重算（只有已载入 RAW 的数据能加进列表），结果表会出现全部参数与归一化残差图。",
+      "notes": "正面场景：参数缺失即方法未用对。"
+    },
+    {
+      "id": "should-trigger-05",
+      "type": "should_trigger",
+      "prompt": "我打开 RAW 发现默认结构计算器被改成了 CRYSOL，用 PDB2SAS 会不会出问题？",
+      "expected_behavior": "答：会——默认值漂移会静默改变你得到的东西。PDB2SAS 本是 RAW 默认，但可能被某个用户改成 CRYSOL；用前到 Options → Advanced Options → General Settings 核对 Default structure calculator（可改回 PDB2SAS）。同时提醒：PDB2SAS 不支持 .cif，须用 .pdb。",
+      "notes": "正面场景：默认计算器陷阱（版本/配置漂移）。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我的 DAMMIF 重建跑完了，怎么判断这个形状能不能用？",
+      "expected_behavior": "走 evaluate-a-shape-reconstruction（七条判据：a-score/NSD/剔除数/簇数/χ²/Rg·Dmax/体积估 MW）。本 skill 只回答「已有高分辨结构与数据是否相容」；若两者不一致，那个 skill 的裁决次序是以本 skill 的拟合结论为准，但评估重建本身仍归对方。",
+      "notes": "诱饵类型：形状重建评估，属相邻 skill。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "低 q 曲线一直往上翘，Guinier 残差是 smile 形，我该不该继续往下做？",
+      "expected_behavior": "走 assess-guinier-fit-quality（smile = 聚集、frown = 排斥；排除 >3–5 个低 q 点即报警）。本 skill 要求先有一条可信曲线，但判 Guinier/聚集不归它。",
+      "notes": "诱饵类型：低 q 病理判读，属相邻 skill。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "这条曲线该报哪个分子量？Porod 体积还是 Vc？",
+      "expected_behavior": "走 choose-a-molecular-weight-method（六法两轴：浓度依赖/无关；4 原生 + 2 ATSAS）。本 skill 里出现 MW 只是模型比对的副产物，不做方法选择。",
+      "notes": "诱饵类型：MW 方法选择，属相邻 skill。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我在 CRYSOL 里加了两个候选模型、两条实验数据，想让它们一次性互相拟合，可以吗？",
+      "expected_behavior": "可以：窗口支持多模型对多数据、多模型对单数据、单模型对多数据；models 列表里只有被勾选的模型参与计算（不需要的取消勾选即可）。但判读要逐对比较 Chi²，不要在多对多的情况下混着下结论；结果表可右键 Export Data 存 csv。",
+      "notes": "边界：多对多拟合的组合方式与判读纪律。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我想手动设溶剂密度和水化层对比度，为什么改不了？",
+      "expected_behavior": "要先关掉对应的「Fit」开关：CRYSOL 需关掉 Fit solvent；PDB2SAS 需同时关掉 Fit solvent 与 Fit hydration shell——否则溶剂密度/对比度是被当作拟合参数由程序解出的，不能手改。",
+      "notes": "边界：参数可编辑的前置条件。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "手里只有一个 .cif 结构，能用 PDB2SAS 拟合吗？",
+      "expected_behavior": "不能——.cif 目前不被 PDB2SAS 支持，须先转成 .pdb；或者改走 CRYSOL 路线（CRYSOL 的 .pdb/.cif 都可作为输入）。同时提醒先核对 Options→Advanced Options→General Settings 的 Default structure calculator。",
+      "notes": "边界：格式与计算器的匹配约束。"
+    }
+  ]
+}

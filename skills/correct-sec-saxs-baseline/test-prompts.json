@@ -1,6 +1,6 @@
 {
   "skill": "correct-sec-saxs-baseline",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "test_cases": [
     {
       "id": "should-trigger-01",
@@ -29,6 +29,13 @@
       "prompt": "我打算对这批 SEC 数据做 EFA 分解，还能同时先做基线校正吗？",
       "expected_behavior": "答'不要叠加'（尤其积分法）：分解会把校正引入的单调变形当成一个组分；要做分解就用峰前+峰后双缓冲液区这条路线。",
       "notes": "正面场景：两条路线的互斥条件。"
+    },
+    {
+      "id": "should-trigger-05",
+      "type": "should_trigger",
+      "prompt": "我用 Integral 基线校正完，高 q 反而更奇怪了，是数据坏了吗？",
+      "expected_behavior": "答'不是数据坏'：Integral 基线校正**只允许基线正向或不变**，无法表达**负校正**，所以需要负校正的 q 会被整体过校。识别：把强度显示切成 `Intensity in q range`，逐段试示例区间 0.01-0.02 / 0.05-0.06 / 0.1-0.2 / 0.2-0.27 Å⁻¹，通常就是**高 q 段**被过校。处置：若确认那段本就是噪声，**先把 profile 截断到较低 q 再做基线校正**，而不是加大校正幅度。",
+      "notes": "正面场景（X5 新增）：积分法单侧限制 + 高 q 过校 + 截断处置。"
     },
     {
       "id": "should-not-trigger-01",
@@ -64,6 +71,20 @@
       "prompt": "我的基线只漂了大概 1%，值不值得做校正？有没有阈值？",
       "expected_behavior": "不编数字：官方材料没有给阈值，判据是定性的——看形状与性质（直线型/累积型）以及它是否落在 Guinier 低 q 区；如果漂移出现在对判读最敏感的低 q，即使幅度小也值得处理，并可用校正前后的曲线差异来验证（教程要求比较两者差异）。",
       "notes": "边界：用户索要阈值，而材料无阈值——考察是否诚实地给定性判据而不是编造数字。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "被过校的那段 q 确实就是噪声，那我加大校正量把它压下去不就行了？",
+      "expected_behavior": "答'不行、方向反了'：加大校正量只会让已经过校的高 q 更糟。既然那段确认是噪声，正确处置是**先把 profile 截断到较低 q，再做基线校正**（官方原句：could truncate the profiles to lower q before doing the baseline correction）；需要负校正的 q 段不要硬用 Integral，可改走双缓冲液区路线。",
+      "notes": "边界（X5 新增）：考察是否把'过校'误当成'校正不足'。"
+    },
+    {
+      "id": "edge-04",
+      "type": "edge_case",
+      "prompt": "线性基线校正时弹了个警告，说前后两段斜率在所有 q 上不一致，我是不是参考区选错了要重划？",
+      "expected_behavior": "答'通常不必'：官方说明线性校正的起止区斜率本来就不必在所有 q 上一致，这条警告 'is usually the case, and mostly can be ignored'（源码层面 `validate_baseline_range` 对 Linear 'almost always returns false, and is of little use'）。要把它与 **Integral 的同类警告**区分开——后者意味着起止点落在仍在变化的基线上，应外移。仅当参考区明显不在平坦基线上时才重划。",
+      "notes": "边界（X5 新增）：把'Linear 警告通常可忽略'这条判据写清，避免与 Integral 警告混为一谈。"
     }
   ]
 }

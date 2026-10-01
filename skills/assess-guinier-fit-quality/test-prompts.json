@@ -1,6 +1,6 @@
 {
   "skill": "assess-guinier-fit-quality",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "test_cases": [
     {
       "id": "should-trigger-01",
@@ -64,6 +64,55 @@
       "prompt": "残差图我看着还行，就是 Rg 在 2.3 和 2.5 nm 之间跳，我该报哪个？",
       "expected_behavior": "不应替用户挑选'更接近文献'的那个；给判停规则：先看 Rg 对取点区间的敏感度，>10–20% 视为不稳定，此时结论应是'该曲线不适合给单一 Rg 值'，并建议做 IFT/距离分布；如仍要报，须带区间与所用 n_min/n_max。",
       "notes": "边界：正是原文没有给、由蒸馏者补上的判停标准。"
+    },
+    {
+      "id": "should-trigger-05",
+      "type": "should_trigger",
+      "prompt": "我的拟合下界 q_min·Rg 算下来是 0.7，这样算合格吗？",
+      "expected_behavior": "答'不合格（默认）'并给阈值：q_min·Rg 应 < 0.65；球/盘状（sphere- or disk-like globular）可放宽到 < 1.0。说明它保证有足够 q 范围算准 Rg/I(0)，且阈值与体系大小绑定——体系越大最低 q 越难达到，可能要专门找低 q 线站。",
+      "notes": "新增：取点下界判据 q_min·Rg<0.65（p2o-01）。"
+    },
+    {
+      "id": "should-trigger-06",
+      "type": "should_trigger",
+      "prompt": "残差图两头高中间低（smile），这说明我样品怎么了？",
+      "expected_behavior": "按形态归因：smile = 聚集；frown（两头低中间高）= 粒子间排斥（多由静电引起，可加盐/降浓度/改 pH）。同时给出易混点——坏 buffer 扣减也会在低 q 造成下沉/上扬、形似聚集/排斥，所以不可仅凭残差判因，须先排除扣减问题再做结论。",
+      "notes": "新增：残差形态诊断 smile/frown（p2o-03）。"
+    },
+    {
+      "id": "should-trigger-07",
+      "type": "should_trigger",
+      "prompt": "我排除了 6 个低 q 点之后曲线才线性，这样还能继续用这份数据吗？",
+      "expected_behavior": "答'基本等于数据有问题、通常不应继续分析'：只有紧邻 beamstop 的 2–3 点可安全忽略，要排除 > 3–5 个低 q 点即报警；并强调 < 1% 的聚集已足以污染最大尺寸与三维重建。给出补救清单（~16000 g 离心 5–10 分钟、加 1–5% 甘油、降浓度、改 pH、加盐、换匹配 buffer），一般建议重采数据。",
+      "notes": "新增：低 q 点排除数量判停 + 补救清单（p2o-04、ce05）。"
+    },
+    {
+      "id": "should-trigger-08",
+      "type": "should_trigger",
+      "prompt": "我的 Kratky 图低 q 上翘，是不是蛋白部分解折叠了？",
+      "expected_behavior": "先证伪再下结论：坏 buffer 扣减也会让 Kratky 图看似有柔性；先确认 buffer 匹配（透析/过柱），再看 Guinier 残差（smile=聚集），并用 P(r) 交叉验证。给球状判据——无量纲 Kratky 峰位 qRg=√3≈1.73、峰高 3/e≈1.1，偏离才是柔性信号；确认后再说柔性。",
+      "notes": "新增：Kratky 交叉验证（a05、ce04）。"
+    },
+    {
+      "id": "should-trigger-09",
+      "type": "should_trigger",
+      "prompt": "我事先不知道粒子的形状，q_max·Rg 到底该取 1.3 还是 1.0？",
+      "expected_behavior": "给降档判停序列：先拟合到 1.3；若残差非平坦，把范围降到 1.0；降到 1.0 后残差变平坦说明粒子偏 extended（保留 1.0）；若降到 1.0 仍非平坦，则是聚集/排斥等问题。解释形状分档：盘≈1.7 / 球≈1.3 / 棒≈1.0，取 1.3/1.0 是为使形状偏离带来的误差 <10%。",
+      "notes": "新增：形状未知时的上界降档（p2o-02）。"
+    },
+    {
+      "id": "should-not-trigger-04",
+      "type": "should_not_trigger",
+      "prompt": "Kratky 窗口里那个 Rebin profiles for plot 复选框是干什么的？",
+      "expected_behavior": "纯界面/操作查询：说明它把该图的数据对数分箱（factor 2）以平滑高 q 噪声，且只作用于图、不写回主窗口曲线——按信息作答或指向 reference，不启动 Guinier 判读流程。",
+      "notes": "新增诱饵：界面/参数查询，属信息检索而非判读决策。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "我的 IDP 样品在 Kratky 图上没有钟形峰，只看到高 q 有个平台，正常吗？",
+      "expected_behavior": "留在本 skill：正常——高 q 平台正是高度灵活/展开（无序）的典型信号，紧凑球状蛋白才呈钟形峰。但仍要先证伪：确认 buffer 匹配、看 Guinier 残差（smile=聚集）、并用 P(r) 交叉验证，避免把坏扣减或聚集误读成柔性。",
+      "notes": "新增边界：Kratky 形态的正确解读 + 先证伪次序。"
     }
   ]
 }

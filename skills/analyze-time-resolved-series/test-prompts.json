@@ -1,0 +1,76 @@
+{
+  "skill": "analyze-time-resolved-series",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我做的时间分辨 SAXS，一批 series 要怎么一起逐点平均、扣掉 buffer，再接上时间轴？",
+      "expected_behavior": "按 E 段走：Multi-Series Analysis → 文件名模板（<s>/<f>）+ Series#/Profiles# + 零填充 → Select files → 定 series 层 buffer/sample 区 → 逐点平均扣减 → Load Calibration（input key/output key/offset）→ q binning/裁剪 → 排除帧 → Rebin series → 存 json。",
+      "notes": "正面场景：本 skill 的教科书式入口。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "cytc 那套 90 条 series、每条 40 个 profile 的数据，文件名模板和编号该怎么填？",
+      "expected_behavior": "给官方实例值：模板 `cytc_01_005_<s>_data_0<f>_<f>.dat`（<f> 出现两次）；Series # 1–90、zero pad 4（0001…0090）；Profiles # 1–40、zero pad 5（00001…00040）；并提示命名约定随设施不同，须先核对。",
+      "notes": "正面场景：载入模板的具体做法。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "时间分辨数据里我算出来的 Rg 曲线第一个点是 0，正常吗？",
+      "expected_behavior": "答'不正常'：首帧常贴近混合器边缘而有额外散射，应在图上读出首点帧号（本例 0）并在 `Exclude profiles` 填入排除、重算，图上验证首个可用帧已变；提示坏帧不能总靠扫曲线看出，必要时看 2D 图像。",
+      "notes": "正面场景：对应 V2 预测力测试的问题。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "低 q 出现负值，最高 q 那边又有一半点是负的，我的 q 范围到底该裁到哪？",
+      "expected_behavior": "给两条判据：低 q 负值多来自混合器窗口寄生散射 → 抬 q_min（本例 0.01 → 0.015），可用低 q 很少到 ~0.01 以下；高 q 约半数点为负说明样品未显著高于背景 → 把 q_max 设在那里（本例 ~0.5–0.55 1/Å）。可先做 Rebin q（Linear/Points=150）降噪。",
+      "notes": "正面场景：本 skill 的核心 q 判据。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "SEC 那一千多帧怎么变成一条曲线，LC Analysis 里 buffer 自动选的能信吗？",
+      "expected_behavior": "走 process-sec-saxs-series（单条 SEC 系列：色谱图 → buffer/sample 帧区间 → 平台判据 → To Profiles Plot）。",
+      "notes": "诱饵类型：同为'造曲线'，但对象是一条洗脱 series，不是一批 series。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "手上是一个样品的 20 张 tif，怎么平均成一条曲线并扣掉缓冲液？",
+      "expected_behavior": "走 reduce-saxs-frames-to-curves（批次还原主线）。",
+      "notes": "诱饵类型：批次帧还原，是本 skill 的上游而非本体。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "SEC 峰重叠了，我想把各个组分分别提取出来，用什么方法？",
+      "expected_behavior": "指向 SVD/EFA/REGALS 分解（独立决策点）；本 skill 只到'接好时间轴、裁好 q、排好帧的净曲线序列'为止，不做分解。",
+      "notes": "诱饵类型：分解恰在本流水线之后，明列为边界。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "单次时间分辨测量自动算不出 Rg/MW，是我的数据坏了吗？",
+      "expected_behavior": "不一定：单次测量信噪常不足（cytc 小分子 + 0.45 M 胍是对比度低的最坏情况）；正确动作是把 5 次重复测量一起载入、加跨全部 series 的 sample 区、勾 `Calibration in header` 选 time 后重算，多数时点即可算出；并提示'至少 3 次测量'的经验。",
+      "notes": "边界：把'算不出'归因到信噪而不是数据损坏。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我这个时间分辨实验的 Rg 变化很快，能勾 Rebin series 来降噪吗？",
+      "expected_behavior": "不要：Rebin series 只适合'数据明显过采样且 Rg 变化平缓、无快过程'的情形（cytc 能 bin 正因为 Rg 只是从 ~23–24 Å 平缓变到 ~18–19 Å）；对快过程做相邻时点平均会把变化抹平。要降噪可改用 Rebin q 或平均多次测量。",
+      "notes": "边界：降噪的代价是时间分辨率，须先确认无快过程。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "我手上没有校准文件，可以把 x 轴变成时间吗？还有这个校准 CSV 里的数值是怎么来的？",
+      "expected_behavior": "说明边界：时间校准需要 profile 头里有可校准的键 + 一份两列 CSV（input,output；# 开头为注释），Cal offset 加到 input 上；CSV 本身怎么由几何/流速产生不在文档覆盖内。若数据之前已校准过，可用 `Calibration in header` 直接取头里的值；否则先把 CSV 准备好再谈换算。",
+      "notes": "边界：校准文件的来源是材料盲点，不编造。"
+    }
+  ]
+}

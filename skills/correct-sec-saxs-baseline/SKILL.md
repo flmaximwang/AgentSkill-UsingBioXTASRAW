@@ -1,6 +1,6 @@
 ---
 name: correct-sec-saxs-baseline
-description: "扣减后强度-帧号仍漂移时按性质选基线校正：束流/仪器漂移→Linear，毛细管污垢→Integral；含过校正识别与 EFA 互斥。用于「SEC 扣减完基线还在抬/在漂」「峰后基线回不到零」「该用哪种基线校正」「校正完高 q 更怪了」「有没有现成脚本做基线校正」；不负责区间选择（转 process-sec-saxs-series）。"
+description: "扣减后强度-帧号仍漂移时按性质选基线校正：束流/仪器漂移→Linear，毛细管污垢→Integral；含过校正识别（切 q 区间逐段查、必要时先截断到低 q 再校正）与 EFA 互斥。用于「SEC 扣减完基线还在抬/在漂」「峰后基线回不到零」「该用哪种基线校正」「校正完高 q 更怪了」「有没有现成脚本做基线校正」；不负责区间选择（转 process-sec-saxs-series）。"
 source_book: BioXTAS RAW 官方文档 *Advanced Series processing – Baseline correction*（v2.4.1）；《利用BioXTAS RAW程序处理SEC-SAXS数据》· 刘广峰
 source_chapter: 源C 全篇 / 源B 第 23–33 步
 tags: [saxs, bioxtas-raw, sec-saxs, baseline-correction, drift]
@@ -29,6 +29,14 @@ related_skills:
 >
 > 出处：源C 积分节 第 7 步
 
+> The warning simply informs you that the slope of the linear correction is not the same in the start and end region at all q values. This is usually the case, and mostly can be ignored.
+>
+> [FILE: tutorial/s2_baseline.rst（Linear 节）]
+
+> You should find that it is the high q ranges that are being overcorrected. This may imply that the profiles are mostly noise in that range. If you examine the profiles and determine that is the case, you could truncate the profiles to lower q before doing the baseline correction.
+>
+> [FILE: tutorial/s2_baseline.rst（Integral 节）]
+
 > An alternative approach to using several buffer regions is to use a single buffer region and apply a baseline correction. Both approaches have advantages and disadvantages. If you want to do EFA deconvolution, it is best to not use a baseline correction, however in other cases it will be more accurate as it doesn't assume a single average buffer across the peak.
 >
 > 出处：源B 第 33 步 note
@@ -45,11 +53,13 @@ related_skills:
 由此推出四条操作性结论，它们才是这个 skill 的主要内容：
 
 1. **每个 q 有各自的校正线。** 所以"只在低 q 做校正"在物理上等于"高 q 完全不校正"，会在 q 方向上留下一个折点（kink）——不能那么做。
-2. **积分法只能往上抬（或不动），于是会过校正。** 若某些 q 本该往下校正，那些 q 没被拉下来，总和就显得抬过头。**过校正通常露在高 q**——因为高 q 段往往已经接近噪声水平。
+2. **积分法只能往上抬（或不动），于是会过校正。** 若某些 q 本该往下校正（即需要**负校正**），那些 q 没被拉下来，总和就显得抬过头。**过校正通常露在高 q**——因为高 q 段往往已经接近噪声水平。
+   - **识别手段（官方）**：把左 Y 轴的强度切换成 `Intensity in q range`，在若干 **q 区间**里逐段看（示例区间：0.01-0.02 / 0.05-0.06 / 0.1-0.2 / 0.2-0.27 Å⁻¹）——被过校的往往就是**高 q 段**。这提示该 q 范围**本身以噪声为主**。
+   - **处置（官方）**：若确认那段本就是噪声，正确动作是**先把 profile 截断到较低 q，再做基线校正**——不是加大校正幅度，也不是硬调参考区。**需要负校正的 q 段，不要硬用 Integral 法。**
 3. **诊断过校正的仪器方法是把强度显示切成 q 区间逐段看**（官方示例试 0.01-0.02 / 0.05-0.06 / 0.1-0.2 / 0.2-0.27 Å⁻¹）。如果确认是高 q 噪声主导，正确处置是**先把曲线截断到较低 q，再做基线校正**，而不是加大校正力度。
 4. **校正与分解是互斥的（在积分法上尤其明确）**：要做 EFA/SVD 分解就不要叠加基线校正——分解算法会把校正引入的单调变形当成一个"组分"。反过来，不做分解时基线校正通常比"假设全峰同一个缓冲液"更准。
 
-一句话判据：**漂移是随时间线性来的（仪器），还是随剂量累积来的（污垢）？** 前者 Linear，后者 Integral；分不清就先看峰前后两段基线的**形状**（直线 vs 单调上弯）。
+一句话判据：**漂移是随时间线性来的（仪器），还是随剂量累积来的（污垢）？** 前者 Linear，后者 Integral；分不清就先看峰前后两段基线的**形状**（直线 vs 单调上弯）。**Integral 的方向性限制（只允许正向或不校正）意味着它天生无法表达负校正**，所以用过它之后必须专门查一遍高 q 是否被过校。
 
 ## A1 — 案例 (Past Application)
 
@@ -103,11 +113,15 @@ related_skills:
    - Linear：在峰前、峰后各划一段"无基线变化"的平段（官方示例各约 30–50 帧）。
    - Integral：在峰前、峰后各划一段平段（官方示例约 460–480 与 860–880；Auto 给的会偏靠峰，需人工外推）。
    完成标准：两段参考区都在真正平的基线上。
-5. **`Set baseline and calculate`**：出现"两段斜率/基线不一致"的警告时，**读懂它**再决定继续（Linear 的这条警告通常可忽略；Integral 的警告意味着起止点选在了仍在变化的区域，应外移）。
+5. **`Set baseline and calculate`**：出现"两段斜率/基线不一致"的警告时，**读懂它**再决定继续。判据要分清两条，别把两者混为一谈：
+   - **Linear 的这条警告通常可忽略**：官方原话是线性校正的斜率"在起止区并非在所有 q 上一致"，"This is usually the case, and mostly can be ignored"（源码层面也印证：`validate_baseline_range` 对 Linear "almost always returns false, and is of little use"）。它只说明两段参考区的斜率不完全相同，**不表示你选错了**。
+   - **Integral 的这条警告有意义**：它意味着起止点选在了**仍在变化**的基线上，应把参考区外移到真正平的段（源C 积分节：把结束区改到 ~800-820 就会触发该警告）。
    完成标准：Baseline Corrected 图上漂移基本消失；Subtracted 图上能看到橙色画出的校正线。
 6. **查过校正**：把强度显示切成 q 区间逐段看（试 0.01-0.02 / 0.05-0.06 / 0.1-0.2 / 0.2-0.27 Å⁻¹）；切法：Series 面板 `Plot Controls` → `Intensity:` 选 `Intensity in q range`，右边填起止 q（或 `View → Series Plot Left Y Axis`）。
    完成标准：能说出"是哪个 q 段被过度校正"。
    - 判停点：确认是高 q 噪声主导 → **先把曲线截断到较低 q**，再做基线校正并重新检查；不要靠调参考区硬压。
+     （官方原句："You should find that it is the high q ranges that are being overcorrected. This may imply that the profiles are mostly noise in that range. If you examine the profiles and determine that is the case, you could truncate the profiles to lower q before doing the baseline correction."）
+   - 根因（要能说出口）：Integral **只允许基线正向或不变**（单调不降），无法表达**负校正**；所以某些 q 需要的负校正没有发生，总和被抬过头。**需要负校正的 q 段不要硬用 Integral**——先截断 q（若那段是噪声），或改走"双缓冲液区"路线。
 7. **重选样品区并交付**：清掉旧样品区 → `Auto` 重新找 → 目视确认平台 → `To Profiles Plot`。
    完成标准：新曲线与未校正版本的差别**能说清楚**（低 q 处应有可见差异，教程明确提示这一点）。
 8. **记录与保存**：把"用了哪种校正、参考区帧号、是否截断 q"写进记录；`Save series` 会连同校正设置一起保存。
@@ -125,7 +139,7 @@ related_skills:
 
 **源里明确警告过的失败模式**
 
-- **积分校正的过校正**（源C 积分节第 7 步）：它只允许基线不降，所以本该向下的校正没有发生，总和被抬过头；识别点是高 q。
+- **积分校正的过校正（单侧限制）**（源C 积分节第 7 步）：Integral **只允许基线不降（正向或不变）**，所以**需要负校正的 q** 本该向下却没被拉上，总和被抬过头。**识别点：切 `Intensity in q range` 逐段看，高 q 段往往被过校**（示例试 0.01-0.02 / 0.05-0.06 / 0.1-0.2 / 0.2-0.27 Å⁻¹）。**处置：若那段本就是噪声，先把 profile 截断到较低 q 再做基线校正**；需要负校正的 q 段不要硬用 Integral。
 - **参考区没落在平坦基线上**（源C 积分节第 6 步）：RAW 会警告；警告意味着"这两点本身还在变"，此时校正没有意义。
 - **把校正当成"让曲线好看"**：源C 的演示明确要求比较校正前后的差异（低 q 处本来就应有差别），说明它不是无痕操作。
 

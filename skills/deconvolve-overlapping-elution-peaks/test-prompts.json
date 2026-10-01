@@ -1,0 +1,83 @@
+{
+  "skill": "deconvolve-overlapping-elution-peaks",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "SEC-SAXS 的主峰有很明显的肩，我怀疑峰里不止一个物种。怎么判断到底有几个组分？",
+      "expected_behavior": "说明要用 SVD 独立数分量：看显著高于高序号平坦基线的奇异值个数，以及左右奇异向量自相关都接近 1（约 >0.6–0.7）的向量个数；两者期望相等。指出 RAW 自动判定可能错、且改帧范围后不自动更新，必须与 SVD 图交叉核对。给出 FIFO→EFA / 非 FIFO→REGALS 的选法。",
+      "notes": "正面场景：本 skill 的教科书式入口。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "EFA 里 Forward 和 Backward 的起点该拖到哪个帧号？我完全没概念",
+      "expected_behavior": "给判据：Forward 起点拖到奇异值首次快速上升处（分量进入数据），Backward 起点拖到奇异值落回基线处（分量离开数据）；再用 Component Range Controls 微调区间直到 χ² 均匀≈1、无尖峰。可给官方示例锚点（phehc_sec：Forward 147/164/322，Backward 383/360/200，最终区间 142–198/161–322/319–360）。",
+      "notes": "正面场景：第二阶调参的核心。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "REGALS 里我把缓冲分量的 lambda 一路加上去，component 1 的曲线突然大变，是不是调过头了？",
+      "expected_behavior": "确认是过平滑：判据是各分量高 q 背景先趋于一致、随后某分量 profile 突然剧变。处置是回调到 last good value（示例 ≈4e8），并按数量级调整（更小的调整几乎无效）；强分量 lambda 可设 0。强调每次改动要手动 Run REGALS（按钮黄底=未更新）。",
+      "notes": "正面场景：过平滑诊断 + REGALS 手动运行。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我用 EFA 拆出三条曲线，怎么知道自己拆出来的结果对不对、能不能用？",
+      "expected_behavior": "给 EFA 三步复核清单：① 所选区间对应 Forward/Backward 起点；② χ² 图均匀接近 1、无大尖峰；③ 取消正性约束（C>=0）后浓度峰不显著变化（显著变化=EFA 差、不可信）；并提醒最终运行必须关掉 \"Start with previous results\"。补充：浓度峰高度本身任意（面积归一为 1），任何去卷积结果都需其它方法/生化数据佐证。",
+      "notes": "正面场景：复核判据（别人猜不到的具体判据）。"
+    },
+    {
+      "id": "should-trigger-05",
+      "type": "should_trigger",
+      "prompt": "我做的是离子交换（IEC-SAXS），盐梯度让背景一直在变，还能用 EFA 吗？",
+      "expected_behavior": "答不能用 EFA（EFA 要求组分严格先进先出），要改用 REGALS（非 FIFO、能处理倾斜/变化背景）；说明用 Background Components 窗口估背景分量数、实验类型选 'IEC/SEC-SAXS'，并给 Forward/Backward 起点判据与 lambda 调法。",
+      "notes": "正面场景：方法阶梯的升级规则。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "SEC 一千多帧的数据，怎么选哪一段是缓冲液、哪一段是样品，最后变成一条曲线？",
+      "expected_behavior": "走 process-sec-saxs-series（LC Analysis 定 buffer/sample 区、平台判据、To Profiles Plot）。",
+      "notes": "诱饵类型：同一条 SEC 流水线的上游——区间选择不是分解。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "扣完缓冲液基线还在整体往上抬，该选 linear 还是 integral 校正？",
+      "expected_behavior": "走 correct-sec-saxs-baseline（按漂移性质选 Linear/Integral）。",
+      "notes": "诱饵类型：基线校正 vs 分解是互斥的，触发词'基线/校正'。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "EFA 和 SVD 的界面分别在哪个菜单里打开？窗口上那几个图分别看什么？",
+      "expected_behavior": "纯界面查询：按数据形态作答或指向 reference（workspace 文档），不启动整套去卷积流程。",
+      "notes": "诱饵类型：界面巡览属信息检索。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "SVD 上我看到 3 个显著奇异值，但自相关接近 1 的只有 2 个向量，到底算几个组分？",
+      "expected_behavior": "留在本 skill：奇异值个数与自相关≈1 的向量个数不等，通常说明有一个弱/分辨不良组分；建议先按较小的数（2）试，再按较大的数（3）试，用 χ² 与浓度曲线判断哪个更自洽。不要直接采信 RAW 自动值。",
+      "notes": "边界：两个判据不一致时的处置。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "数据做过 integral 基线校正了，我还能直接在上面跑 EFA 吗？",
+      "expected_behavior": "提醒做 EFA 最好不做基线校正（官方 note）：分解算法会把校正引入的单调变形当成一个组分，与 Integral 校正尤其冲突。建议回到未校正数据做 EFA，或改走 REGALS（它自带背景分量建模，能处理倾斜基线）。判停：若已做基线校正且必须分解，转 REGALS 并说明取舍。",
+      "notes": "边界：基线校正与 EFA 的互斥性（跨 skill）。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "滴定数据只有 16 个点，我是不是也该用 EFA 先把分量区间找出来？",
+      "expected_behavior": "答不该：点数太少、又是非 FIFO，EFA 找区间不可用；应走 REGALS，且实验类型选 Titration、取消 'Use EFA to find component ranges'，用先验知识设分量数与 X 轴（Log10，首点 log(0) 问题改非零）。补充 Dmax 设置：聚集体用 Shannon 限上界（示例 300 Å），构象靠 χ²/P(r) 收敛（示例取 130）。",
+      "notes": "边界：滴定/稀疏采样下 EFA 不适用。"
+    }
+  ]
+}

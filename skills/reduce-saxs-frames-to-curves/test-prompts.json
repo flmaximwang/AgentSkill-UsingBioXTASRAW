@@ -1,6 +1,6 @@
 {
   "skill": "reduce-saxs-frames-to-curves",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "test_cases": [
     {
       "id": "should-trigger-01",
@@ -31,6 +31,27 @@
       "notes": "正面场景：落盘环节，属本 skill 的第 4 段。"
     },
     {
+      "id": "should-trigger-05",
+      "type": "should_trigger",
+      "prompt": "我有 SAXS 和 WAXS 两个探测器的数据，怎么把它们拼成一条覆盖更宽 q 的曲线？",
+      "expected_behavior": "走 WAXS 合并段：载 WAXS.cfg → 单独把含 PIL3 的 WAXS buffer/样品帧平均并扣减 → 载回已存的 SAXS 扣减曲线 → 把其一移到下 plot → 给 WAXS 侧乘 scale factor（示例 0.000014）→ 给 WAXS 标星、右击 SAXS 曲线 → Other Operations → Merge，生成 `M_` 前缀合并曲线。判据：交接 q 处平滑接续。",
+      "notes": "正面场景：双探测器 WAXS 合并，本 skill 新增能力。"
+    },
+    {
+      "id": "should-trigger-06",
+      "type": "should_trigger",
+      "prompt": "我平均这批帧时 RAW 弹窗说 not all statistically the same，直接点 Average Only Similar Files 就行了吗？",
+      "expected_behavior": "可以用它自动只平均'与第一个文件统计相同'的帧，但要补关键判据：统计判定只与所用检验/阈值一样好，自动剔除比人工目视更保守（官方 damage_data 例：自动剔 8–10、人工宜剔 6–10）；必须再用目视 + Similarity Test 面板复核，不能把自动剔除当结论。",
+      "notes": "正面场景：相似性三视图驱动平均，考察是否把'自动更保守 + 须人工复核'讲成判据。"
+    },
+    {
+      "id": "should-trigger-07",
+      "type": "should_trigger",
+      "prompt": "RAW 存的 .dat 和 .out 有什么区别？我能不能直接双击用 Excel 打开",
+      "expected_behavior": "按格式参考回答：.dat 是曲线（三列 Q/I(Q)/Error，行首 # 为头、### HEADER: 后为 json）；.out 是 GNOM 的 IFT 输出、四段（Configuration/Results/Experimental Data and Fit/Real Space Data），.ift 是 BIFT 输出、首行 # BIFT；两者都需 Import wizard（Delimited + Space），且 Excel 导入时列标题会右移一列、.out 的部分 I Reg 会落错列需手工搬列。",
+      "notes": "正面场景：落盘格式与外部互操作，本 skill 新增参考覆盖。"
+    },
+    {
       "id": "should-not-trigger-01",
       "type": "should_not_trigger",
       "prompt": "我这条曲线的 Rg 是 2.4 nm，能说明我的蛋白是什么状态吗？单体还是二聚体",
@@ -52,6 +73,13 @@
       "notes": "诱饵类型：界面巡览属信息检索，已被阶段 1.5 判为不成 skill。"
     },
     {
+      "id": "should-not-trigger-04",
+      "type": "should_not_trigger",
+      "prompt": "我想把曲线的强度放到绝对刻度 cm⁻¹，该用水还是玻碳标样？常数算出来多少才对",
+      "expected_behavior": "走 put-saxs-data-on-an-absolute-scale：那是绝对刻度本身的方法学（三法分叉、两条顺序约束、基准常数 0.00077/324/198）。本 skill 只负责把曲线还原出来，强度归一到绝对刻度是配置/定标环节。",
+      "notes": "诱饵类型：同为'让曲线可交付'的相邻环节，但决策点不同（绝对强度刻度 vs 2D→1D 还原）。"
+    },
+    {
       "id": "edge-01",
       "type": "edge_case",
       "prompt": "20 帧平均完就够了吗？我看有几帧曲线明显飘，要不要把它们去掉？",
@@ -64,6 +92,13 @@
       "prompt": "我按流程扣减完了，曲线看着挺舒服，但下游说这条数据不能用。可能哪里漏了？",
       "expected_behavior": "用状态机自检：没有 `S_` 前缀说明扣减没成功（星标角色给错）；`*` 还在说明没真正写盘；再看是否混入了坏帧；若曲线本身小 q 异常则提示帧的选取或配置问题（必要时转 configure skill）。",
       "notes": "边界：故障归因，需要把两三条机制合起来用。"
+    },
+    {
+      "id": "edge-03",
+      "type": "edge_case",
+      "prompt": "我把 WAXS 那些 PIL3 文件和 SAXS 的 tif 一起载进 RAW 积分了，结果 SAXS 曲线全废了，怎么回事？",
+      "expected_behavior": "指出这是跨探测器陷阱：SAXS 与 WAXS 属于不同几何、各有各的 cfg，混载后 SAXS 结果整段作废且不报错。正确顺序是各自 cfg 下先各自还原，再按 scale factor（示例 0.000014）归并；不要把它们放进同一次积分。",
+      "notes": "边界：操作顺序错误，症状是'SAXS 曲线全废'；考察是否归因到'两套帧不能同载'而不是怀疑数据。"
     }
   ]
 }
