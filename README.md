@@ -8,7 +8,7 @@
 | 《利用BioXTAS RAW程序处理SEC-SAXS数据》（同上，2024-04-28）+ 官方教程 *Basic SEC-SAXS processing* 与 *Baseline correction* | SEC 系列处理 / 基线校正（**第二源 = 官方文档**，因为译文砍掉了整节） | [`books/sec-saxs-series/`](books/sec-saxs-series/) |
 | **BioXTAS RAW v2.4.2 官方文档全站**（97 文件 / 16,010 行；tutorial 37 节 + manual 19 节 + saxs 5 节 + api 11 节 + install 16 节） | 整条判据流水线：配置 / 还原 / Guinier / IFT 与 P(r) / MW / 绝对刻度 / 重建评估 / 模型拟合 / 去卷积 / 时间分辨 / RAWAPI | [`books/bioxtas-raw-official-docs/`](books/bioxtas-raw-official-docs/) |
 
-**13 个 skill 覆盖 13 个决策点**：配置是否就绪 → 一批帧怎么变成曲线 → 读出的 Rg 信不信得过 → SEC 洗脱里哪一段算一个样品 → 扣减后还在漂怎么办 → 强度怎么钉到绝对刻度 → 从 I(q) 到 P(r) 与 Dmax → 分子量该用哪一法 → 重建做完能不能用 → 高分辨模型怎么对照 → 峰重叠怎么分解 → 时间分辨怎么精修 → 怎么用脚本批量做。
+**14 个 skill**：13 个「决策点」skill（下面索引表）+ 1 个**端到端流水线** skill（第 14 行，工程产物、非蒸馏）：配置是否就绪 → 一批帧怎么变成曲线 → 读出的 Rg 信不信得过 → SEC 洗脱里哪一段算一个样品 → 扣减后还在漂怎么办 → 强度怎么钉到绝对刻度 → 从 I(q) 到 P(r) 与 Dmax → 分子量该用哪一法 → 重建做完能不能用 → 高分辨模型怎么对照 → 峰重叠怎么分解 → 时间分辨怎么精修 → 怎么用脚本批量做。
 
 蒸馏流水线是 **cangjie-skill（book2skill）的 RIA-TV++**：整文理解 → 5 视角提取（三本共 **224 条候选**）→ 三重验证（V1 跨域 / V2 预测力 / V3 独特性）→ RIA++ 构造 → Zettelkasten 链接 → 压力测试（独立盲测）→ 人性化输出（学习笔记 + 话术库）。
 
@@ -32,6 +32,7 @@
 | [deconvolve-overlapping-elution-peaks](skills/deconvolve-overlapping-elution-peaks/SKILL.md) | 峰重叠按复杂度选 SVD / EFA / REGALS；分量数 → 区间 → λ 三阶调参 + χ² 与正性约束复核 | `references/deconvolution-workflow.md` |
 | [analyze-time-resolved-series](skills/analyze-time-resolved-series/SKILL.md) | 一批 series 一起精修：时间校准 → q 裁剪/rebin → 排除帧 → 帧合并；S/N 与测量次数判据 | `references/multi-series-workflow.md` |
 | [script-raw-with-the-python-api](skills/script-raw-with-the-python-api/SKILL.md) | 用 RAWAPI 批量/可复现地做同一件事（load → analyse → save 三段骨架 + 函数清单 + 对象访问） | `references/rawapi-function-inventory.md` |
+| [run-a-sec-saxs-pipeline-end-to-end](skills/run-a-sec-saxs-pipeline-end-to-end/SKILL.md) | **端到端跑一条 SEC-SAXS 系列**（图像→报告，全在 RAW 里做）：补逐帧 BL19U2 header txt 让 RAW 归一化（不写归一化 tif）→ 归一化裁剪视频 → buffer/sample 区与扣减 → 多区间 Guinier → IFT → MW → DAMMIF/DENSS → 各节点 `.dat`/表/PDF 报告 | `references/bl19u2-header-normalization.md`、`scripts/`（3 个可执行脚本） |
 
 给人看的文档：[第 1 本学习笔记](books/bioxtas-raw-manual/LEARNING_NOTE.md) · [SEC 本](books/sec-saxs-series/LEARNING_NOTE.md) · [官方文档本](books/bioxtas-raw-official-docs/LEARNING_NOTE.md)；
 话术库：[第 1 本](books/bioxtas-raw-manual/TALKING_POINTS.md) · [SEC 本](books/sec-saxs-series/TALKING_POINTS.md) · [官方文档本](books/bioxtas-raw-official-docs/TALKING_POINTS.md)。
@@ -60,10 +61,34 @@ for s in configure-bioxtas-raw-for-a-dataset reduce-saxs-frames-to-curves assess
          process-sec-saxs-series correct-sec-saxs-baseline put-saxs-data-on-an-absolute-scale \
          compute-and-validate-p-of-r choose-a-molecular-weight-method evaluate-a-shape-reconstruction \
          fit-a-high-resolution-model-to-data deconvolve-overlapping-elution-peaks \
-         analyze-time-resolved-series script-raw-with-the-python-api; do
+         analyze-time-resolved-series script-raw-with-the-python-api \
+         run-a-sec-saxs-pipeline-end-to-end; do
   hermes skills install "flmaximwang/AgentSkill-UsingBioXTASRAW/skills/$s" --category saxs -y
 done
 ```
+
+## 端到端流水线（第 14 个 skill：非蒸馏产物）
+
+`run-a-sec-saxs-pipeline-end-to-end` 不是从书里蒸出来的，是**按用户验收条件 + 真实数据实测**写出来的工程产物
+（2026-10-01 BL19U2 的 BSA SEC-SAXS 数据，2000 帧）。它的三个脚本，每一步都跑过真数据：
+
+| 脚本 | 做什么 | 实测凭据 |
+|---|---|---|
+| `scripts/emit-bl19u2-header-txt.py` | 监视器 + 采集日志 → **每帧 BL19U2 header txt**（`Transmitted_Beam` = 该帧曝光窗口内监视器中位数），写到源目录与 tif 并排 | 2000 帧全出；监视器 19651 行 ≙ 9.83 采样/帧（**行≠帧**，必须按时间窗口取）；开头 5 个 `~1e-13` 野值按 5% 中位阈值丢弃；lag 自动扫出 **−32 帧 ≈ −48 s，corr 0.869**；逐帧因子全在 ±5% 内 |
+| `scripts/crop-video-normalized.py` | 裁剪区（左下原点坐标）→ **读入时乘归一化因子** → rawvideo 管道给 ffmpeg；不落归一化 tif | 试片 120 帧 / 0.5 MB / 8× / 20 fps，`frame=120` 核对通过，抽帧确认落在束挡区 |
+| `scripts/run-raw-sec-pipeline.py` | RAWAPI 全程：积分（含逐帧 header 归一化）→ series → buffer/sample 区 → 扣减/基线 → 逐帧 Rg/I0/MW → **多区间 Guinier** → IFT → MW → DAMMIF/DENSS → RAW PDF 报告；**每个节点都落 `.dat`** | 2000 帧积分 ~80 s；`counters.TB` 与 txt 完全一致；开/关归一化的 I(q) 之比 = 1/TB（逐帧 <1e-6 偏差） |
+
+真实数据上撞到的两条结论（已写进 skill 的坑与边界）：
+
+- **RAW 的 BL19U2 header 归一化是"内建"的**：`SASFileIO.py:909` 按 `<图像名>.txt` 读 header，
+  `NormalizationList=[['/','Transmitted_Beam']]` 逐帧求值（`SASImage.py:366-380`）。线站 `.cfg` 里这套**已经写好了**，
+  只差 `ImageHdrFormat` 与 `EnableNormalization` 两个开关 → **不需要写归一化 tif**（省 18 GB）。
+- **`find_buffer_range` 会在"弱峰 + 强漂移"的 SEC 系列上失败**（返回 `success=False`、区间 `None`）：
+  本次 BSA 数据的低 q 强度在 50 min 里单调抬升 ~40%（束位/几何漂移，与 `beam-instability` 参考档一致），
+  洗脱峰只是骑在漂移上的一个小包（中 q 去漂移后在 **≈第 690 帧**附近 +1~2 个单位，峰宽约 620–760 帧）。
+  这种系列必须**手工给 `--buffer-range/--sample-range`**，并在扣减后考虑 Integral 基线校正。
+
+
 
 ## 蒸馏来源与边界（必读）
 
