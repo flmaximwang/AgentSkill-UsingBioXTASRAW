@@ -1,6 +1,6 @@
 ---
 name: reduce-saxs-frames-to-curves
-description: "把 SAXS 帧还原成 1D 曲线（积分→平均→扣减→存 .dat）；SEC-SAXS 不覆盖。A_/S_/* 自检进度。用于「这批 tif 怎么变成一条曲线」「交给 ATSAS 导出什么格式」「文件名前的 * 和 S_ 是什么意思、能不能删」「扣减完下游说不能用」；不负责从曲线读 Rg、也不负责判断 Rg 好坏。"
+description: "把 SAXS 帧还原成 1D 曲线（积分→平均→扣减→存 .dat）；A_/S_/* 自检进度。SEC-SAXS 系列（连续洗脱帧）走 process-sec-saxs-series。用于「这批 tif 怎么变成一条曲线」「交给 ATSAS 导出什么格式」「文件名前的 * 和 S_ 是什么意思、能不能删」「扣减完下游说不能用」；不负责从曲线读 Rg、也不负责判断 Rg 好坏。"
 source_book: 《BioXTAS RAW程序使用说明》· 刘广峰（公众号「生物小角」）· 2024-04-26
 source_chapter: §4 数据预处理（①–⑩）+ §2 界面
 tags: [saxs, bioxtas-raw, reduction, averaging, buffer-subtraction, bl19u2]
@@ -9,6 +9,8 @@ related_skills:
     relation: depends-on
   - slug: assess-guinier-fit-quality
     relation: composes-with
+  - slug: process-sec-saxs-series
+    relation: contrasts-with
 ---
 
 # 把 20 张帧变成一条曲线（2D → 1D 的还原流水线）
@@ -90,7 +92,7 @@ related_skills:
 
 - 与 `configure-bioxtas-raw-for-a-dataset`：那条负责"配置是否就绪/怎么确证"。本 skill 的第 1 步就是"确认配置已加载"，**没就绪就转过去**，不在这里凑合。
 - 与 `assess-guinier-fit-quality`：本 skill 到"一条扣减过的曲线"为止；**曲线物理上可不可信**（Rg、寡聚态、适合哪种分析）不在本 skill。
-- 与 SEC-SAXS 处理：走 Series 选项卡，是另一条线（本 skill 不覆盖，见 B 段）。
+- 与 SEC-SAXS 处理：**连续洗脱的系列数据走 `process-sec-saxs-series`**（Series 选项卡、色谱图、"哪一段是一个物种"的平台判据），不要用批次平均的判据去套。
 
 ## E — 执行步骤 (Execution)
 
@@ -122,7 +124,7 @@ related_skills:
 **不要用的场景**
 
 - 手上已经是 `.dat` 曲线（没有 2D 帧可还原）→ 直接去 `assess-guinier-fit-quality`。
-- **SEC-SAXS**：数据在 Series 选项卡里看，处理逻辑不是"批次平均"，本 skill 不覆盖。
+- **SEC-SAXS**：连续洗脱的系列数据走 `process-sec-saxs-series`（Series 选项卡 + 色谱图 + 平台判据），本 skill 的"批次平均"逻辑不适用；扣减后仍有基线漂移时再转 `correct-sec-saxs-baseline`。
 - **IFT/GNOM、Shape&Size、Bayesian MW、3D 重建、与 PDB 对齐**：本文只列了名称与一个外链（`bioxtas-raw.readthedocs.io`），没有流程与判据——不要拿本 skill 当这些事的指南（反例 `p4/ce05`）。
 - 用户问的是"这条曲线说明我的蛋白是什么状态"——那是分析层，不是还原层。
 

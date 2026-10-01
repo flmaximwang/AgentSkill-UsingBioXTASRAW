@@ -67,7 +67,7 @@ graph TD
 
 ## 边界（本次蒸馏明确不覆盖的事）
 
-- **SEC-SAXS 处理**：数据在 Series 选项卡里看，原文只有一个选项卡说明，没有流程（淘汰组见 `rejected/README.md`）。
+- **SEC-SAXS 处理**：已在**升级包** [`books/sec-saxs-series/`](../sec-saxs-series/INDEX.md) 中补齐（`process-sec-saxs-series` + `correct-sec-saxs-baseline`，来源为该主题的微信文章 + BioXTAS RAW 官方教程两页）。本包的 `rejected/README.md` 里那一组的重启条件因此已满足。
 - **分子量测定**：原文只列六条路线名（标样 I0 比对 / 绝对校准 / Vc / Vp / Shape&Size / Bayesian），无步骤无判据 → 不成 skill。
 - **IFT/GNOM、形状重建、3D 重建、与 PDB 对齐**：原文只到外链（https://bioxtas-raw.readthedocs.io/ ）。
 - **RAW 的安装**：一次性操作，随版本变 → 写成事实放在 `configure-…` 的 B 段。

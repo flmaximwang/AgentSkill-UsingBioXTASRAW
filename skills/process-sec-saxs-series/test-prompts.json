@@ -1,0 +1,69 @@
+{
+  "skill": "process-sec-saxs-series",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "在 BL19U2 做了一轮 SEC-SAXS，一千多帧，怎么弄成一条能用的曲线？",
+      "expected_behavior": "按 E 段走：确认配置 → 用 Plot Series 载入整个系列（不是 Plot）→ 剔端点帧（首帧可能偏弱；BL19U2 末帧不参与强度校正）→ 读色谱图 → LC Analysis 定缓冲液区（Auto 后人工复核）→ Set buffer 看逐帧 Rg/MW → 用平台判据选样品区 → To Profiles Plot → 转 assess-guinier-fit-quality。",
+      "notes": "正面场景：本 skill 的教科书式入口。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "LC Analysis 里 Buffer 我直接点了 Auto，那个区间可以信吗？",
+      "expected_behavior": "答'不能直接信'并给出机制：自动只认'低而平'，主峰旁大而平的前缘肩部最容易被误选，而那一带常是未解析的高阶寡聚体；必须放大到基线处人工核对，必要时用 UV 痕排除次要洗脱组分。",
+      "notes": "正面场景：自动化的默认值不是物理判断。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "峰上那个 Rg 随帧号的曲线看着不平，我怎么知道哪一段可以送去合并？",
+      "expected_behavior": "给平台判据：找 Rg 与 MW 在峰中心平稳的一段（单分散的标志），并说明两侧起伏的来源（低信噪比、肩峰、左右基线不等）；找不到平台就不要硬选，回查缓冲液区或考虑未分开的组分。",
+      "notes": "正面场景：本 skill 的核心判据。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "SEC 的分子量怎么算？能用标样或者绝对校准定浓度吗",
+      "expected_behavior": "答'不能用'：洗脱峰内浓度随时间变化且未知，I(0) 标样比对/绝对校准在 SEC 上不成立；MW 只能走 Vc 与 Vp 这类体积法，且两法结果不一致属正常、要并列报告。",
+      "notes": "正面场景：材料里明确写死的限制，且源 A 没说。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "手上是一个样品的 20 张 tif，怎么平均成一条曲线并扣掉缓冲液？",
+      "expected_behavior": "走 reduce-saxs-frames-to-curves（批次还原：选文件 → Average → Subtract → 存 .dat）。",
+      "notes": "诱饵类型：同为'造一条曲线'，但数据形态是批次帧而不是洗脱过程。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "SEC 数据扣减完，强度-帧号还是整体往上抬，该选 linear 还是 integral？",
+      "expected_behavior": "走 correct-sec-saxs-baseline（本 skill 只到'扣减后一条曲线'为止）。",
+      "notes": "诱饵类型：同一条流水线的下一段，触发词是'基线/校正'。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "RAW 绘图面板那四个选项卡分别看什么？Series 和 Profiles 有什么区别？",
+      "expected_behavior": "纯界面查询：按数据形态作答或指向 reference，不启动 SEC 处理流程。",
+      "notes": "诱饵类型：界面巡览属信息检索。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "主峰前面有两个小峰，要不要把它们一起平均进样品里？",
+      "expected_behavior": "留在本 skill：说明它们通常是被部分分开的高阶寡聚体/聚集体，**属于样品、不属于背景**；正确处理是把缓冲液区限制在真正无洗脱的平段（必要时用 UV 痕确认），并在报结论时说明峰前存在未解析组分。不要把它们塞进缓冲液区（会造成假单分散）。",
+      "notes": "边界：考察是否把'小峰'归错到背景里。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我图省事，先把每帧都扣了缓冲液，再把这些扣减过的曲线做了 Average，这样有问题吗？",
+      "expected_behavior": "指出顺序反了：共用同一条缓冲液会使各帧误差相关化，平均不再按 √N 降噪（官方 note 明确）；正确做法是缓冲液区先平均、样品区按窗口平均后再相减。建议重做，并提示 RAW 的 To Profiles Plot 就是这个顺序。",
+      "notes": "边界：操作顺序错误，症状是'结果对缓冲液区长度异常敏感'。"
+    }
+  ]
+}

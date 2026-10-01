@@ -1,0 +1,69 @@
+{
+  "skill": "correct-sec-saxs-baseline",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "SEC 数据扣完缓冲液之后，峰后面的基线回不到零、整体还抬着，怎么办？",
+      "expected_behavior": "先判断漂移性质（直线型 vs 单调累积型），再选 linear/integral；说明校正只保留峰前缓冲液区的前提，并给出两条替代路线的取舍（双缓冲液区 vs 基线校正）。",
+      "notes": "正面场景：本 skill 最典型的症状。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "基线校正到底该选 linear 还是 integral？两个有什么区别",
+      "expected_behavior": "给选型规则：仪器/束流漂移 → Linear；毛细管污垢（污染随剂量累积）→ Integral；并说明二者都是每个 q 各一条校正线。",
+      "notes": "正面场景：核心决策。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "做了积分基线校正之后，低 q 反而翘起来了，是不是校正过头了？",
+      "expected_behavior": "解释 Integral 只允许基线不降，因此本该向下的校正没发生、总量被抬过头；诊断办法是把强度显示切成 q 区间逐段看，过校正通常在高 q；处置是先截断到较低 q 再校正，而不是硬调参考区。",
+      "notes": "正面场景：过校正的识别与处置。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我打算对这批 SEC 数据做 EFA 分解，还能同时先做基线校正吗？",
+      "expected_behavior": "答'不要叠加'（尤其积分法）：分解会把校正引入的单调变形当成一个组分；要做分解就用峰前+峰后双缓冲液区这条路线。",
+      "notes": "正面场景：两条路线的互斥条件。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "SEC 的一千多帧怎么变成一条曲线？buffer 区怎么定？",
+      "expected_behavior": "走 process-sec-saxs-series（区间选择与平台判据）。",
+      "notes": "诱饵类型：同一条流水线的上一段。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "Baseline Corrected 那一档图在哪里看？和 Subtracted 有什么区别",
+      "expected_behavior": "纯界面查询：说明三档图各自的纵轴含义（或指向 reference），不启动校正流程。",
+      "notes": "诱饵类型：界面巡览。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "我把 n_min 从 11 调到 5，Rg 从 2.4 变到 3.1 nm，该报哪个？",
+      "expected_behavior": "走 assess-guinier-fit-quality（取点与判读），不涉及 SEC 基线。",
+      "notes": "诱饵类型：同领域的判读问题。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我能不能只对低 q 那一段做基线校正？高 q 我不管",
+      "expected_behavior": "答'不能'：校正对每个 q 各施加一条线，只改低 q 相当于对高 q 完全不校正，会在 q 方向留下折点，使 Guinier 区与高 q 来自两套假设；若高 q 是噪声主导，应先把曲线截断到低 q 再做校正。",
+      "notes": "边界：把'分 q 校正'误解为'挑几个 q 校正'。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我的基线只漂了大概 1%，值不值得做校正？有没有阈值？",
+      "expected_behavior": "不编数字：官方材料没有给阈值，判据是定性的——看形状与性质（直线型/累积型）以及它是否落在 Guinier 低 q 区；如果漂移出现在对判读最敏感的低 q，即使幅度小也值得处理，并可用校正前后的曲线差异来验证（教程要求比较两者差异）。",
+      "notes": "边界：用户索要阈值，而材料无阈值——考察是否诚实地给定性判据而不是编造数字。"
+    }
+  ]
+}
