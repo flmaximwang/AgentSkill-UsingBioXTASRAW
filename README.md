@@ -8,7 +8,10 @@
 | 《利用BioXTAS RAW程序处理SEC-SAXS数据》（同上，2024-04-28）+ 官方教程 *Basic SEC-SAXS processing* 与 *Baseline correction* | SEC 系列处理 / 基线校正（**第二源 = 官方文档**，因为译文砍掉了整节） | [`books/sec-saxs-series/`](books/sec-saxs-series/) |
 | **BioXTAS RAW v2.4.2 官方文档全站**（97 文件 / 16,010 行；tutorial 37 节 + manual 19 节 + saxs 5 节 + api 11 节 + install 16 节） | 整条判据流水线：配置 / 还原 / Guinier / IFT 与 P(r) / MW / 绝对刻度 / 重建评估 / 模型拟合 / 去卷积 / 时间分辨 / RAWAPI | [`books/bioxtas-raw-official-docs/`](books/bioxtas-raw-official-docs/) |
 
-**15 个 skill**：13 个「决策点」skill（下面索引表）+ 2 个**端到端流水线** skill（第 14–15 行，工程产物、非蒸馏）：配置是否就绪 → 一批帧怎么变成曲线 → 读出的 Rg 信不信得过 → SEC 洗脱里哪一段算一个样品 → 扣减后还在漂怎么办 → 强度怎么钉到绝对刻度 → 从 I(q) 到 P(r) 与 Dmax → 分子量该用哪一法 → 重建做完能不能用 → 高分辨模型怎么对照 → 峰重叠怎么分解 → 时间分辨怎么精修 → 怎么用脚本批量做；两条流水线分别吃 **SEC 连续洗脱帧**与**管式/静态帧**（差别在 control 从哪来）。
+**14 个 skill**：13 个「决策点」skill（下面索引表）+ 1 个**端到端流水线** skill（管式/静态帧，工程产物、非蒸馏）：配置是否就绪 → 一批帧怎么变成曲线 → 读出的 Rg 信不信得过 → SEC 洗脱里哪一段算一个样品 → 扣减后还在漂怎么办 → 强度怎么钉到绝对刻度 → 从 I(q) 到 P(r) 与 Dmax → 分子量该用哪一法 → 重建做完能不能用 → 高分辨模型怎么对照 → 峰重叠怎么分解 → 时间分辨怎么精修 → 怎么用脚本批量做；流水线吃**管式/静态帧**。
+
+> **SEC 端到端流水线已迁出**：`run-a-sec-saxs-pipeline-end-to-end` 现在住在 [`AgentSkill-DoingSAXS`](https://github.com/flmaximwang/AgentSkill-DoingSAXS)
+> （与"判数据/归因"的 skill 同包，避免两处维护）。本仓库不再保留它的副本。
 
 蒸馏流水线是 **cangjie-skill（book2skill）的 RIA-TV++**：整文理解 → 5 视角提取（三本共 **224 条候选**）→ 三重验证（V1 跨域 / V2 预测力 / V3 独特性）→ RIA++ 构造 → Zettelkasten 链接 → 压力测试（独立盲测）→ 人性化输出（学习笔记 + 话术库）。
 
@@ -32,7 +35,6 @@
 | [deconvolve-overlapping-elution-peaks](skills/deconvolve-overlapping-elution-peaks/SKILL.md) | 峰重叠按复杂度选 SVD / EFA / REGALS；分量数 → 区间 → λ 三阶调参 + χ² 与正性约束复核 | `references/deconvolution-workflow.md` |
 | [analyze-time-resolved-series](skills/analyze-time-resolved-series/SKILL.md) | 一批 series 一起精修：时间校准 → q 裁剪/rebin → 排除帧 → 帧合并；S/N 与测量次数判据 | `references/multi-series-workflow.md` |
 | [script-raw-with-the-python-api](skills/script-raw-with-the-python-api/SKILL.md) | 用 RAWAPI 批量/可复现地做同一件事（load → analyse → save 三段骨架 + 函数清单 + 对象访问） | `references/rawapi-function-inventory.md` |
-| [run-a-sec-saxs-pipeline-end-to-end](skills/run-a-sec-saxs-pipeline-end-to-end/SKILL.md) | **端到端跑一条 SEC-SAXS 系列**（图像→报告，全在 RAW 里做）：补逐帧 BL19U2 header txt 让 RAW 归一化（不写归一化 tif）→ 归一化裁剪视频 → buffer/sample 区与扣减 → 多区间 Guinier → IFT → MW → DAMMIF/DENSS → 各节点 `.dat`/表/PDF 报告 | `references/bl19u2-header-normalization.md`、`scripts/`（3 个可执行脚本） |
 | [run-a-tube-saxs-pipeline-end-to-end](skills/run-a-tube-saxs-pipeline-end-to-end/SKILL.md) | **端到端跑一批管式/静态 SAXS 帧**（目录内样品 + 夹着它的 control，图像→报告，全程 RAW）：归一化开关（`ImageHdrFormat`/`EnableNormalization`）→ control 相对缩放（1–3% 高 q 残留用 `scaleRelative` 定标）→ 多区间 Guinier 闸门表（Rg 漂移/`chi2_red`/curvature/`qRg`）→ BIFT 跑两次 + 可信闸门（Dmax 会跑出搜索域）→ MW → DENSS（DAMMIF 需 ATSAS）→ 各节点 `.dat`/表/PDF/GUI workspace；**整批跑法**：3 并行 + `summarize-tube-run.py`（31 列汇总 + 稀释序列检查）+ `plot-tube-overview.py` | `references/tube-control-pairing-and-scaling.md`、`scripts/`（3 个可执行脚本） |
 
 给人看的文档：[第 1 本学习笔记](books/bioxtas-raw-manual/LEARNING_NOTE.md) · [SEC 本](books/sec-saxs-series/LEARNING_NOTE.md) · [官方文档本](books/bioxtas-raw-official-docs/LEARNING_NOTE.md)；
@@ -63,21 +65,25 @@ for s in configure-bioxtas-raw-for-a-dataset reduce-saxs-frames-to-curves assess
          process-sec-saxs-series correct-sec-saxs-baseline put-saxs-data-on-an-absolute-scale \
          compute-and-validate-p-of-r choose-a-molecular-weight-method evaluate-a-shape-reconstruction \
          fit-a-high-resolution-model-to-data deconvolve-overlapping-elution-peaks \
-         analyze-time-resolved-series script-raw-with-the-python-api \
-         run-a-sec-saxs-pipeline-end-to-end; do
+         analyze-time-resolved-series script-raw-with-the-python-api; do
   hermes skills install "flmaximwang/AgentSkill-UsingBioXTASRAW/skills/$s" --category saxs -y
 done
 ```
 
-## 端到端流水线（第 14 个 skill：非蒸馏产物）
+## 端到端流水线（管式）：非蒸馏产物
+
+> **SEC 那条（`run-a-sec-saxs-pipeline-end-to-end`）已迁到 [`AgentSkill-DoingSAXS`](https://github.com/flmaximwang/AgentSkill-DoingSAXS)**：
+> `hermes skills install flmaximwang/AgentSkill-DoingSAXS/skills/run-a-sec-saxs-pipeline-end-to-end --category saxs -y`。
+> 下面留一份它的实测凭据（当时的踩坑记录对本仓库的判据 skill 仍有参照价值）。
 
 `run-a-sec-saxs-pipeline-end-to-end` 不是从书里蒸出来的，是**按用户验收条件 + 真实数据实测**写出来的工程产物
-（2026-10-01 BL19U2 的 BSA SEC-SAXS 数据，2000 帧）。它的三个脚本，每一步都跑过真数据：
+（2026-10-01 BL19U2 的 BSA SEC-SAXS 数据，2000 帧）。它的四个脚本，每一步都跑过真数据：
 
 | 脚本 | 做什么 | 实测凭据 |
 |---|---|---|
 | `scripts/emit-bl19u2-header-txt.py` | 监视器 + 采集日志 → **每帧 BL19U2 header txt**（`Transmitted_Beam` = 该帧曝光窗口内监视器中位数），写到源目录与 tif 并排 | 2000 帧全出；监视器 19651 行 ≙ 9.83 采样/帧（**行≠帧**，必须按时间窗口取）；开头 5 个 `~1e-13` 野值按 5% 中位阈值丢弃；lag 自动扫出 **−32 帧 ≈ −48 s，corr 0.869**；逐帧因子全在 ±5% 内 |
 | `scripts/crop-video-normalized.py` | 裁剪区（左下原点坐标）→ **读入时乘归一化因子** → rawvideo 管道给 ffmpeg；不落归一化 tif | 试片 120 帧 / 0.5 MB / 8× / 20 fps，`frame=120` 核对通过，抽帧确认落在束挡区 |
+| `scripts/results_readme.py` + `scripts/write-results-readme.py` | 结果目录 → **给人看的 `README.md`**（目录导航 + 关键数字 + 判读红线 + 本次告警；只读产物不重算） | 管线末步自动写；旧目录用 `write-results-readme.py --out <目录>` 补写。首版在 bsa / 4LI2-676 两个结果目录上实跑核对 |
 | `scripts/run-raw-sec-pipeline.py` | RAWAPI 全程：积分（含逐帧 header 归一化）→ series → buffer/sample 区 → 扣减/基线 → 逐帧 Rg/I0/MW → **多区间 Guinier** → IFT → MW → **形状重建（电子云 DENSS 总跑 + 珠模 DAMMIF 有 ATSAS 才跑）** → RAW PDF 报告；**每个节点都落 `.dat`** | 2000 帧积分 ~80 s；`counters.TB` 与 txt 完全一致；开/关归一化的 I(q) 之比 = 1/TB（逐帧 <1e-6 偏差）；DENSS（Fast）实测 ~2 s 出 `.mrc`（bsa：Rg 29.2 Å / support 6.3e5 Å³），本机无 ATSAS → 只出电子云、日志明说 |
 
 真实数据上撞到的两条结论（已写进 skill 的坑与边界）：
@@ -85,7 +91,7 @@ done
 - **RAW 的 BL19U2 header 归一化是"内建"的**：`SASFileIO.py:909` 按 `<图像名>.txt` 读 header，
   `NormalizationList=[['/','Transmitted_Beam']]` 逐帧求值（`SASImage.py:366-380`）。线站 `.cfg` 里这套**已经写好了**，
   只差 `ImageHdrFormat` 与 `EnableNormalization` 两个开关 → **不需要写归一化 tif**（省 18 GB）。
-- **ATSAS 接上后的实测（2026-10-01，`/Applications/ATSAS-4.1.4-1/bin`）**：GNOM 出 `.out`、DAMMIF×4（Fast，~8-20 s/模型）、DAMAVER 出聚类与 NSD；bsa 给 `χ²=2.08 / Rg 28.0 Å / Dmax≈88 Å / MW 63 kDa`、`NSD=0.06`（对上 BSA 单体 66.5 kDa）；同流程的 4LI2-676 给 `χ²=27.7`、3 个聚类、DENSS 失败 → 判为"曲线还不够干净"，不交付模型。接线坑：`--atsas-dir` 要指到 `bin`；`dammif` 输出名是 `<prefix>-1.<format>` 而 `damaver` 只吃文件名；`mw_bayes`/`mw_datclass` 没有 `settings` 参数。
+- **ATSAS 接上后的实测（2026-10-01，`/Applications/ATSAS-4.1.4-1/bin`）**：GNOM 出 `.out`、DAMMIF×4（Fast，8–40 s/模型）、DAMAVER 出聚类与 NSD；bsa 给 `χ²=2.08 / Rg 28.0 Å / Dmax≈88 Å / MW 63 kDa`、DAMAVER **平均 NSD 0.75 ± 0.06**（对上 BSA 单体 66.5 kDa；注意 RAWAPI 返回的第 2 个值是 stdev，均值要读 `*-damaver-distances.txt` 的 `Mean value of nsd`）；4LI2-676 在**补齐成 1800 帧 + 开线站 txt 归一化**后给 `χ²=4.65 / Rg 16.2 Å / Dmax≈53 Å / MW 12–14 kDa`（可用）——**同一份数据在旧的 1464 帧无归一化版本上是 `χ²=27.7`、3 个聚类、DENSS 直接失败**，正好证明"χ² 大是数据问题，不是重建参数问题"。接线坑：`--atsas-dir` 要指到 `bin`；`dammif` 输出名是 `<prefix>-1.<format>` 而 `damaver` 只吃文件名；`mw_bayes`/`mw_datclass` 没有 `settings` 参数。
 - **形状重建是两件事，不是一件**：电子云（DENSS，`.mrc`，RAW 原生）与珠模（DAMMIF，`.pdb`，ATSAS 可执行文件的外壳）是同一份 IFT 的两种重建——`models/` 空着是错的；没 ATSAS 时先出电子云并在日志明说，装了再补珠模。
 - **`find_buffer_range` 会在"弱峰 + 强漂移"的 SEC 系列上失败**（返回 `success=False`、区间 `None`）：
   本次 BSA 数据的低 q 强度在 50 min 里单调抬升 ~40%（束位/几何漂移，与 `beam-instability` 参考档一致），
