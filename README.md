@@ -8,7 +8,7 @@
 | 《利用BioXTAS RAW程序处理SEC-SAXS数据》（同上，2024-04-28）+ 官方教程 *Basic SEC-SAXS processing* 与 *Baseline correction* | SEC 系列处理 / 基线校正（**第二源 = 官方文档**，因为译文砍掉了整节） | [`books/sec-saxs-series/`](books/sec-saxs-series/) |
 | **BioXTAS RAW v2.4.2 官方文档全站**（97 文件 / 16,010 行；tutorial 37 节 + manual 19 节 + saxs 5 节 + api 11 节 + install 16 节） | 整条判据流水线：配置 / 还原 / Guinier / IFT 与 P(r) / MW / 绝对刻度 / 重建评估 / 模型拟合 / 去卷积 / 时间分辨 / RAWAPI | [`books/bioxtas-raw-official-docs/`](books/bioxtas-raw-official-docs/) |
 
-**14 个 skill**：13 个「决策点」skill（下面索引表）+ 1 个**端到端流水线** skill（第 14 行，工程产物、非蒸馏）：配置是否就绪 → 一批帧怎么变成曲线 → 读出的 Rg 信不信得过 → SEC 洗脱里哪一段算一个样品 → 扣减后还在漂怎么办 → 强度怎么钉到绝对刻度 → 从 I(q) 到 P(r) 与 Dmax → 分子量该用哪一法 → 重建做完能不能用 → 高分辨模型怎么对照 → 峰重叠怎么分解 → 时间分辨怎么精修 → 怎么用脚本批量做。
+**15 个 skill**：13 个「决策点」skill（下面索引表）+ 2 个**端到端流水线** skill（第 14–15 行，工程产物、非蒸馏）：配置是否就绪 → 一批帧怎么变成曲线 → 读出的 Rg 信不信得过 → SEC 洗脱里哪一段算一个样品 → 扣减后还在漂怎么办 → 强度怎么钉到绝对刻度 → 从 I(q) 到 P(r) 与 Dmax → 分子量该用哪一法 → 重建做完能不能用 → 高分辨模型怎么对照 → 峰重叠怎么分解 → 时间分辨怎么精修 → 怎么用脚本批量做；两条流水线分别吃 **SEC 连续洗脱帧**与**管式/静态帧**（差别在 control 从哪来）。
 
 蒸馏流水线是 **cangjie-skill（book2skill）的 RIA-TV++**：整文理解 → 5 视角提取（三本共 **224 条候选**）→ 三重验证（V1 跨域 / V2 预测力 / V3 独特性）→ RIA++ 构造 → Zettelkasten 链接 → 压力测试（独立盲测）→ 人性化输出（学习笔记 + 话术库）。
 
@@ -33,6 +33,7 @@
 | [analyze-time-resolved-series](skills/analyze-time-resolved-series/SKILL.md) | 一批 series 一起精修：时间校准 → q 裁剪/rebin → 排除帧 → 帧合并；S/N 与测量次数判据 | `references/multi-series-workflow.md` |
 | [script-raw-with-the-python-api](skills/script-raw-with-the-python-api/SKILL.md) | 用 RAWAPI 批量/可复现地做同一件事（load → analyse → save 三段骨架 + 函数清单 + 对象访问） | `references/rawapi-function-inventory.md` |
 | [run-a-sec-saxs-pipeline-end-to-end](skills/run-a-sec-saxs-pipeline-end-to-end/SKILL.md) | **端到端跑一条 SEC-SAXS 系列**（图像→报告，全在 RAW 里做）：补逐帧 BL19U2 header txt 让 RAW 归一化（不写归一化 tif）→ 归一化裁剪视频 → buffer/sample 区与扣减 → 多区间 Guinier → IFT → MW → DAMMIF/DENSS → 各节点 `.dat`/表/PDF 报告 | `references/bl19u2-header-normalization.md`、`scripts/`（3 个可执行脚本） |
+| [run-a-tube-saxs-pipeline-end-to-end](skills/run-a-tube-saxs-pipeline-end-to-end/SKILL.md) | **端到端跑一批管式/静态 SAXS 帧**（目录内样品 + 夹着它的 control，图像→报告，全程 RAW）：归一化开关（`ImageHdrFormat`/`EnableNormalization`）→ control 相对缩放（1–3% 高 q 残留用 `scaleRelative` 定标）→ 多区间 Guinier 闸门表（Rg 漂移/`chi2_red`/curvature/`qRg`）→ BIFT 的 Dmax 搜索域 → MW → DENSS（DAMMIF 需 ATSAS）→ 各节点 `.dat`/表/PDF/GUI workspace | `references/tube-control-pairing-and-scaling.md`、`scripts/run-raw-tube-pipeline.py` |
 
 给人看的文档：[第 1 本学习笔记](books/bioxtas-raw-manual/LEARNING_NOTE.md) · [SEC 本](books/sec-saxs-series/LEARNING_NOTE.md) · [官方文档本](books/bioxtas-raw-official-docs/LEARNING_NOTE.md)；
 话术库：[第 1 本](books/bioxtas-raw-manual/TALKING_POINTS.md) · [SEC 本](books/sec-saxs-series/TALKING_POINTS.md) · [官方文档本](books/bioxtas-raw-official-docs/TALKING_POINTS.md)。
