@@ -160,7 +160,7 @@ with open(os.path.join(root, "README.md"), "w") as fh:
              "- `_summary/` —— 汇总：`summary.md` / `summary.csv`（一行一样品）、`overview.png`\n"
              "- `_logs/` —— 每个样品的**完整运行日志**（某样品结果不对劲时先看这里）\n"
              "- `_rawqc/` —— 原始帧质量评估（如果跑过 `assess-saxs-raw-data-quality`）\n"
-             "- `_old-flat/` —— 早期扁平布局留下的产物，仅存档\n\n")
+             "\n")
     fh.write("## 怎么再生 / 换参数\n\n")
     fh.write("```bash\n"
              "for d in <项目>/data/Tube-SAXS/*/; do\n"
