@@ -165,6 +165,9 @@ python run-raw-sec-pipeline.py --series-dir <tif 目录> --out-dir <产物根> -
   `RAW.py:1232-1242` 拼的是 `os.path.join(atsas_dir, 'dammif')`，`RAWAPI.dammif` 会抛 `NoATSASError`。
   没有 ATSAS 时跑 RAW 原生 `denss` + `bift`（都可用），装好 ATSAS（`https://biosaxs.com/download`，学术免费，
   需个性化 license）后加 `--atsas-dir <ATSAS>/bin` 即切到 DAMMIF/GNOM。
+- **有的 SEC 系列根本没有监视器/日志**（本机 `4LI2-676`：1464 个 tif，无 `.Iochamber`、无 `_00001.log`）：
+  这时 Step 1 无法执行 → 用 `--no-header-normalization` 跑（RAW 的 `ImageHdrFormat=None`、不启用归一化），
+  视频也省略 `--norm-csv`（因子全 1）。**要在报告里写明"这条系列没有通量归一化"**，别让读者以为做了。
 - **逐帧 txt 写进源数据目录**是刻意的（RAW 只在同目录找 `<帧名>.txt`）；写之前目录里若已有同名 txt 会被拒绝，
   真要覆盖才 `--force`——线站原件优先。
 - **系列没有监视器 / 采集日志时不能做逐帧归一化**（本机 `4LI2-676` 就是这种：目录里只有 1464 个 tif，
