@@ -326,22 +326,32 @@ def node_ift(ctx, sub, rec, i0, i1, dmax_scale=3.1, dmax_pts=10):
             continue
         dmax, rgr, i0r, dmax_e, rgr_e = res[1], res[2], res[3], res[4], res[5]
         chisq = res[7]
-        gates = dict(rg_vs_guinier=abs(rgr - rg) / rg <= 0.10,
+        # The Rg the IFT is compared against is only a real reference when the multi-range
+        # Guinier scan actually passed its gates; if that reference itself failed, the
+        # agreement test gets a soft (25 %) tolerance instead of 10 % and is flagged.
+        soft = not (rec and all(rec["gates"].values()))
+        rg_tol = 0.25 if soft else 0.10
+        gates = dict(rg_vs_guinier=abs(rgr - rg) / rg <= rg_tol,
                      dmax_over_rg=(dmax / rg) <= 4.5,
                      dmax_within_grid=(dmax <= 1.5 * hi))
         row = dict(tag=tag, idx_min=idx_min, qmin=float(sub.getQ()[idx_min]), qmax=float(sub.getQ()[i1]),
                    dmax=float(dmax), dmax_err=float(dmax_e), rg_realspace=float(rgr),
                    rg_err=float(rgr_e), i0=float(i0r), chisq=float(chisq),
+                   rg_tol=rg_tol, rg_ref_soft=bool(soft),
                    seconds=time.time() - t, gates=gates, trusted=all(gates.values()))
         rows.append(row)
         ifts[tag] = ift
-        log("  Dmax=%.1f+-%.1f  Rg(real)=%.1f  chisq=%.2f  trusted=%s  %s  (%.0fs)"
-            % (dmax, dmax_e, rgr, chisq, row["trusted"], gates, row["seconds"]))
+        log("  Dmax=%.1f+-%.1f  Rg(real)=%.1f  chisq=%.2f  trusted=%s  %s  rg_tol=%.0f%%%s"
+            "  (%.0fs)" % (dmax, dmax_e, rgr, chisq, row["trusted"], gates,
+                          rg_tol * 100, " [soft ref]" if soft else "", row["seconds"]))
 
-    trusted = [r for r in rows if r.get("trusted")]
-    best = (min(trusted, key=lambda r: r["chisq"]) if trusted
-            else (min([r for r in rows if "failed" not in r], key=lambda r: r["chisq"])
-                  if any("failed" not in r for r in rows) else None))
+    def _rank(r):                      # fewest failed gates first, then chi^2
+        return (sum(1 for v in r["gates"].values() if not v), r["chisq"])
+
+    solved = [r for r in rows if "failed" not in r]
+    trusted = [r for r in solved if r["trusted"]]
+    best = min(trusted, key=lambda r: r["chisq"]) if trusted else (
+        min(solved, key=_rank) if solved else None)
     out = dict(runs=rows, chosen=best["tag"] if best else None,
                trusted=bool(best and best.get("trusted")))
     if not best:
@@ -350,7 +360,7 @@ def node_ift(ctx, sub, rec, i0, i1, dmax_scale=3.1, dmax_pts=10):
         log("IFT: no *trusted* solution (see gates); best is %s - 3D will be skipped and the "
             "P(r) must not be reported" % best["tag"])
     ift = ifts.get(best["tag"]) if best else None
-    if ift is not None:
+    if ift is not None and best.get("trusted"):
         raw.save_ift(ift, "bift.ift", os.path.join(ctx.out, "ifts"))
         np.savetxt(os.path.join(ctx.out, "ifts", "pr.dat"),
                    np.column_stack([ift.r, ift.p, ift.err]),
@@ -358,19 +368,30 @@ def node_ift(ctx, sub, rec, i0, i1, dmax_scale=3.1, dmax_pts=10):
         np.savetxt(os.path.join(ctx.out, "ifts", "ift_fit.dat"),
                    np.column_stack([ift.q_orig, ift.i_orig, ift.err_orig, ift.i_fit]),
                    header="q\tI_measured\terr\tI_fit(BIFT)")
+    elif ift is not None:
+        # nothing passed: keep the best-effort solution under a name that says so, so it can
+        # be inspected in the RAW GUI without being mistaken for a result
+        raw.save_ift(ift, "bift_untrusted_%s.ift" % best["tag"], os.path.join(ctx.out, "ifts"))
+        np.savetxt(os.path.join(ctx.out, "ifts", "pr_untrusted_%s.dat" % best["tag"]),
+                   np.column_stack([ift.r, ift.p, ift.err]),
+                   header="r(A)\tP(r)\terr\t[RAW BIFT, start=%s - UNTRUSTED, do not report]"
+                          % best["tag"])
     jdump(out, os.path.join(ctx.out, "tables", "ift_summary.json"))
     with open(os.path.join(ctx.out, "tables", "ift_summary.csv"), "w") as fh:
         fh.write("tag,idx_min,qmin,qmax,Dmax,Dmax_err,Rg_realspace,Rg_err,I0,chisq,"
-                 "pass_rg,pass_dmax_over_rg,pass_dmax_within_grid,trusted,seconds\n")
+                 "rg_tol,rg_ref_soft,pass_rg,pass_dmax_over_rg,pass_dmax_within_grid,"
+                 "trusted,seconds\n")
         for r in rows:
             if "failed" in r:
-                fh.write("%s,%d,-,-,-,-,-,-,-,-,,,,,0\n" % (r["tag"], r["idx_min"]))
+                fh.write("%s,%d,-,-,-,-,-,-,-,-,,-,,,,0\n" % (r["tag"], r["idx_min"]))
                 continue
             g = r["gates"]
-            fh.write("%s,%d,%.5f,%.5f,%.2f,%.2f,%.2f,%.2f,%.2f,%.4f,%d,%d,%d,%d,%.0f\n"
+            fh.write("%s,%d,%.5f,%.5f,%.2f,%.2f,%.2f,%.2f,%.2f,%.4f,%.2f,%d,%d,%d,%d,%d,"
+                     "%.0f\n"
                      % (r["tag"], r["idx_min"], r["qmin"], r["qmax"], r["dmax"], r["dmax_err"],
-                        r["rg_realspace"], r["rg_err"], r["i0"], r["chisq"], g["rg_vs_guinier"],
-                        g["dmax_over_rg"], g["dmax_within_grid"], r["trusted"], r["seconds"]))
+                        r["rg_realspace"], r["rg_err"], r["i0"], r["chisq"], r["rg_tol"],
+                        int(r["rg_ref_soft"]), g["rg_vs_guinier"], g["dmax_over_rg"],
+                        g["dmax_within_grid"], r["trusted"], r["seconds"]))
     return (ift if (best and best.get("trusted")) else None), out
 
 

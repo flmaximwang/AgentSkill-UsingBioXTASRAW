@@ -153,7 +153,12 @@ python run-raw-tube-pipeline.py --sample-dir <目录> --cfg <日期>.cfg --out-d
 - **control 缩放因子要取"粒子不散射"的 q 窗**：窗取得太低（比如 q 0.15–0.25）会把蛋白自己的信号当背景扣掉
   （本机 A5-05-1 实测：q 0.15–0.25 给 1.09，q 0.30–0.44 给 1.024 —— 前者明显偏大）。
 - **`save_workspace` 会把扩展名换成 `.hdf5`**（传 `xx.rwa` 得到 `xx.hdf5`），别以为没写成功。
-- **BIFT 失败的样子**是返回 `dmax=400`、`chisq` 几十：先看 Dmax 域是不是太宽，再看 q 上界是不是把噪声区也喂进去了。
+- **BIFT 的 Dmax 会跑出搜索域**（RAWAPI 文档原文：*"The value of Dmax can go beyond this bound in the optimization step"*）：
+  实测 `A5-05-6` 用 48–109 Å 的网格交出 **Dmax=741 Å、chisq=1.09**——一个看着完美的假解；之前直接拿去建 DENSS，
+  得到 `Rg_model=266 Å / support 6.95e7 Å³` 的垃圾。本 skill 的对策：BIFT **跑两次**（分析窗起点 / Guinier 拟合自己的起点），
+  三条闸门判可信（Rg 与 Guinier 对得上、`Dmax ≤ 4.5·Rg`、Dmax 未越出搜索网格 1.5 倍；Guinier 自身没通过闸门时 Rg 那条放宽到 25% 并标 `rg_ref_soft`）；
+  **不可信就不建 3D、不报 P(r)**，只留 `ifts/*_untrusted_*.ift` 供目视。修正后同一条数据变成 `Rg_model=22.5 Å / 6.7e4 Å³`。
+- **BIFT 失败的样子**也可能是 `dmax` 顶在搜索域上限、`chisq` 几十：先看 Dmax 域是不是太宽，再看 q 上界是不是把噪声区也喂进去了。
 - **ATSAS 不在**：`GNOM/DAMMIF/DAMMIN/DATGNOM/DATMW/DATCLASS/CIFSUP/CRYSOL` 全不可用；
   GUI 菜单仍然显示这些项，`Tools → ATSAS → GNOM` 会直接弹 "Can't find ATSAS"（这就是无 ATSAS 的判定点）。
   装好后 `--atsas-dir <ATSAS>/bin` 即可切换；ATSAS 学术免费但要个性化 license。

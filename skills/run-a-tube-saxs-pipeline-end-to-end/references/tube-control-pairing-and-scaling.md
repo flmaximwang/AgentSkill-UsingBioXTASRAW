@@ -99,6 +99,13 @@ RAW 默认 `minDmax/maxDmax = 10/400 Å`、`DmaxPoints=10`、`PrPoints=100`。�
 脚本按 `0.7–1.6 × 3.1·Rg` 收窄（球状粒子的 Dmax≈3.1 Rg 起手），实测 `A5-05-1`：
 收窄前 `Dmax=400.1 Å / Rg(realspace)=127.7 Å / chisq=32.8`；收窄后 `Dmax=48.4 Å / Rg=18.3 Å / chisq 仍高`。
 `--ift-sweep N` 会扫 Dmax 并落 `tables/ift_dmax_sweep.csv`（看 chisq 谷底的平台）。
+
+**但这个域不是硬边界**：RAWAPI 原文写着 *"The value of Dmax can go beyond this bound in the optimization step"*。
+实测 `A5-05-6`（最稀那条）在 48–109 Å 的网格下交出 **Dmax=741.4 Å、Rg(realspace)=269 Å、chisq=1.09**，
+而把 IFT 起点从"分析窗起点"换成"Guinier 拟合自己的起点"（idx 78，q≥0.0368）后是 **Dmax=88.9 Å、Rg=25.3 Å、chisq=1.23**。
+两条都"收敛"，只有闸门能分辨：本 skill 因此**跑两次 BIFT**并落 `tables/ift_summary.csv` 两行
+（列：`tag / qmin / qmax / Dmax / Rg_realspace / chisq / rg_tol / rg_ref_soft / pass_rg / pass_dmax_over_rg / pass_dmax_within_grid / trusted`），
+不可信的那条不进 3D、也不占用 `ifts/bift.ift` 这个名字。
 注意 `chisq` 在低 q 信噪比很高的管式数据上会被系统误差主导（几十也可能代表"拟合形状是对的、误差被低估"），
 要**和实空间 Rg 对 Guinier Rg 的一致性一起看**，不能只看一个数。
 
