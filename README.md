@@ -20,6 +20,18 @@
 给人看的两份文档：[学习笔记](books/bioxtas-raw-manual/LEARNING_NOTE.md) · [话术库](books/bioxtas-raw-manual/TALKING_POINTS.md)。
 skill 总览与引用图：[`books/bioxtas-raw-manual/INDEX.md`](books/bioxtas-raw-manual/INDEX.md)。
 
+## 质量凭据（阶段 4 盲测）
+
+把 3 条 description **按 Hermes 路由时真实的 57 字符截断** + 27 条 prompt 交给 2 位独立评测者逐条判路由：
+
+| 轮次 | 评测者 A | 评测者 B | 处置 |
+|---|---|---|---|
+| 1（初始） | 78% | 81% | 两人在**同样 4 条**上判错 → 回炉阶段 2 改 description 的可见头 |
+| 2（修后） | **96%** | **89%** | 03/10 两条两位都改对 |
+| 3（再挪排除条款，8 条子集） | **88%** | **100%** | SEC-SAXS 一位已改对，残留为真歧义（低风险） |
+
+细节（含判定口径的调整与理由、残留问题评估）见 [`test-results.md`](books/bioxtas-raw-manual/test-results.md)。
+
 ## 安装（三段式标识符，按仓库内路径，不需要 tap；`--category` 只决定落点）
 
 ```bash
