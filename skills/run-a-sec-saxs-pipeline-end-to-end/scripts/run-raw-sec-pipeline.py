@@ -451,7 +451,9 @@ def step_shape(ift, ifts, out, prefix, args, atsas_dir, model_ift=None):
             try:
                 a = raw.damaver(files, f"{prefix}_damaver", mdir,
                                 model_format=args.model_format, atsas_dir=atsas_dir)
-                log(f"  DAMAVER: NSD={a[1] if len(a) > 1 else '?'}")
+                # 返回是 (mean_nsd, stdev_nsd, include_list, ...)：第 2 个是标准差，别当一致性指标
+                log(f"  DAMAVER: 平均 NSD={a[0]:.3f} ± {a[1]:.3f}"
+                    f"（代表模型见 models/{prefix}_damaver-global-summary.txt）")
             except Exception as exc:
                 log(f"  ！DAMAVER 失败：{type(exc).__name__}: {exc}")
 

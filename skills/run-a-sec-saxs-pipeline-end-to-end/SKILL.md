@@ -202,10 +202,14 @@ DENSS 是 RAW 原生（numba），`Fast` 模式实测几秒到几十秒就出；
   `FileNotFoundError: <prefix>-damaver-distances.txt`（看着像 DAMAVER 坏了，其实是输入清单错了）；
   ③ `mw_bayes` / `mw_datclass` **没有 `settings` 参数**（签名是 `profile, rg, i0, first, atsas_dir, ...`），
   传 `atsas_dir` 才生效，否则一直报 TypeError 被误当"没装 ATSAS"。
-- **出珠模要 `Slow`，`Fast` 只能当"探雷"**：本机同一条 bsa 曲线，4 个 `Fast` 模型 DAMAVER 给
-  **NSD = 0.77±0.06、自动分成 2 个簇**（互不一致 → 不能直接平均），换 `Slow` 后 **NSD = 0.09**（单一簇、可用）。
-  代价：`Fast` 约 8–40 s/模型，`Slow` 约 3 min/模型（4 个约 12 min）。顺序应是 Fast 看 χ²、确认数据能建模，
-  再 Slow 出正式交付。
+- **`damaver` 的返回值里第 2 个是标准差，不是均值**：`NSD=0.09` 这种日志看着很美，其实那是 stdev ——
+  均值要读 `models/<前缀>_damaver-distances.txt` 的 `Mean value of nsd`（代表模型在
+  `-global-summary.txt` 的 `Most representative`）。**别把 stdev 当一致性指标**。
+- **Fast/Slow 与 NSD 没有单调关系，判质量还是看 χ² + 聚类数**：本机同一条 bsa，`Fast` 4 模型
+  `χ²=2.08、平均 NSD 0.77±0.06`（2 簇）、`Slow` 4 模型 `χ²=2.08、平均 NSD 1.11±0.09`（2 簇）——
+  Fast 反而"更雷同"（都收敛到相似的模糊解）。另两条 `Slow`：4LI2-676 `1.16±0.20`（3 簇）、
+  4DH2-676-apo-3 `1.17±0.29`（3 簇）。代价：`Fast` 8–40 s/模型，`Slow` 约 3 min/模型（4 个 ≈12 min）——
+  先用 Fast 看 χ² 能否建模，交付前用 Slow 复核。
 - **χ² 大 = 这组数据还不配做从头建模**，别在重建参数里找答案。三条实测（同一套流程、同一天）：
   bsa `χ²=2.08 / Rg 28.0 Å / Dmax≈87 Å / MW 61 kDa / DAMAVER NSD 0.09`（可用）；4LI2-676
   `χ²=4.87 / Rg 16.3 Å / Dmax≈53 Å / MW 9 kDa / NSD 0.20`（可用）；4DH2-676-apo-3
