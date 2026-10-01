@@ -76,7 +76,20 @@ metadata:
   （源码树会遮蔽 site-packages 里编译好的 `sascalc_exts`，直接 ImportError）。
 - 核对该会话的 `.cfg`（定心/距离/掩膜/标样）→ `configure-bioxtas-raw-for-a-dataset`。
 
-### Step 1 — 补出逐帧 header txt（`emit-bl19u2-header-txt.py`）
+### Step 1 — 逐帧 header txt：**先看线站给了什么**，再决定生成还是不生成
+
+**1a. 线站已给逐帧 txt（`tif` 旁边就有 `<帧名>.txt`）→ 只读因子，不重生成：**
+
+```bash
+python emit-bl19u2-header-txt.py \
+  --series-dir <原始 tif 目录> --from-txt-dir <同一个目录> --out-dir <产物根>
+```
+
+（只把每份 txt 里的 `Transmitted_Beam` 汇总成 `<out>/norm/normalization_factors.csv` 给 Step 2 用；
+RAW 那边本来就直接读这些 txt，**不需要 monitor/log，也不要 `--force` 覆盖线站原件**。
+本机 `4LI2-676` 第二次下机就是这种：1800 份 txt、TB 中位 0.521、1–99% 展宽 4.6%。）
+
+**1b. 只给了监视器 + 日志 → 生成逐帧 txt：**
 
 ```bash
 python emit-bl19u2-header-txt.py \
@@ -137,7 +150,7 @@ python run-raw-sec-pipeline.py --series-dir <tif 目录> --out-dir <产物根> -
 | 多区间 Guinier | `auto_guinier` + `guinier_fit(idx_min, idx_max)` | `profiles/06_guinier/guinier_<标签>.dat`、`tables/guinier_multi_range.csv` + `.png` |
 | IFT | `bift`（原生）/ `auto_dmax`+`gnom`（需 ATSAS） | `ifts/<前缀>_bift.ift` / `_gnom.out`、`tables/ift_summary.csv` |
 | 分子量 | `mw_vc` / `mw_vp` / `mw_bayes` | `tables/mw.csv` |
-| 形状重建 | `denss`（**电子云，RAW 原生，默认总跑**）+ `dammif`/`damaver`（**珠模，有 ATSAS 才跑**） | `models/<前缀>_denss.mrc`（+`_support.mrc`/`_map.fit`/`_stats_by_step.dat`/`_denss.log`）；有 ATSAS 时另有 `models/<前缀>_dammif_*.pdb` + `_damaver` |
+| 形状重建 | `denss`（**电子云，RAW 原生，默认总跑**）+ `dammif`/`damaver`（**珠模，有 ATSAS 才跑**） | `models/<前缀>_denss.mrc`（+`_support.mrc`/`_map.fit`/`_stats_by_step.dat`/`_denss.log`）；有 ATSAS 时另有 `models/<前缀>_dammif_0N-1.cif`（**ATSAS≥4.0 写 `.cif`，不是 `.pdb`**）+ DAMAVER 的 `<前缀>_damaver-{distances.txt,global-summary.txt,global-fsc.dat,cluster*-summary.txt,global-damaver.cif}` |
 | 报告 | `save_report(pdf, dir, profiles, ifts, series)` | `reports/<前缀>_raw_report.pdf` |
 
 **形状重建两个都要**（`--model-engine auto`）：**电子云（DENSS，`.mrc`）与珠模（DAMMIF，`.pdb`）是同一份 IFT 的两种重建，互不替代**——
@@ -169,14 +182,14 @@ DENSS 是 RAW 原生（numba），`Fast` 模式实测几秒到几十秒就出；
   `RAW.py:1232-1242` 拼的是 `os.path.join(atsas_dir, 'dammif')`，`RAWAPI.dammif` 会抛 `NoATSASError`。
   没有 ATSAS 时跑 RAW 原生 `denss` + `bift`（都可用），装好 ATSAS（`https://biosaxs.com/download`，学术免费，
   需个性化 license）后加 `--atsas-dir <ATSAS>/bin` 即切到 DAMMIF/GNOM。
-- **有的 SEC 系列根本没有监视器/日志**（本机 `4LI2-676`：1464 个 tif，无 `.Iochamber`、无 `_00001.log`）：
-  这时 Step 1 无法执行 → 用 `--no-header-normalization` 跑（RAW 的 `ImageHdrFormat=None`、不启用归一化），
-  视频也省略 `--norm-csv`（因子全 1）。**要在报告里写明"这条系列没有通量归一化"**，别让读者以为做了。
+- **逐帧 txt 有三种来源，先看清楚再动手**：① 线站已经给了（本机 `4LI2-676` 第二次下机就带了 1800 份
+  `<帧名>.txt`，和 tif 并排）→ **不要重新生成**，用 `--from-txt-dir <目录>` 只把它们的 `Transmitted_Beam`
+  读成因子表（给视频用），RAW 那边本来就直接读这些 txt；② 只给了监视器 + 日志 → 用 Step 1 生成；
+  ③ 两样都没有（本机 `4EH2-KDPV-ZN`：445 个 tif，无 `.Iochamber`/`.log`/`.txt`）→ 只能
+  `--no-header-normalization` 跑（RAW `ImageHdrFormat=None`），视频省略 `--norm-csv`（因子全 1），
+  **并在报告里写明"本系列未做通量归一化"**，别让读者以为做了。
 - **逐帧 txt 写进源数据目录**是刻意的（RAW 只在同目录找 `<帧名>.txt`）；写之前目录里若已有同名 txt 会被拒绝，
   真要覆盖才 `--force`——线站原件优先。
-- **系列没有监视器 / 采集日志时不能做逐帧归一化**（本机 `4LI2-676` 就是这种：目录里只有 1464 个 tif，
-  没有 `.Iochamber` 也没有 `.log`）。这时第 1 步无从做起，跑 RAW 要加 `--no-header-normalization`
-  （否则 RAW 会去找不存在的 `<帧名>.txt`），视频也不给 `--norm-csv`（因子全 1）。产物里要写明"本系列未做通量归一化"。
 - **`--buffer-range` 优先给峰前 + 峰后两段**（`"560,620;800,880"`）：SEC 峰后的基线常不等于峰前
   （窗口污染 / 束位漂移）。本机实测同一条 BSA 曲线，只用峰前一段时 Guinier 的 Rg 在 38–117 Å 之间随区间乱跳；
   换成峰前+峰后两段后落到 **23.7–27.4 Å、r² 0.91–0.99**（BSA 单体理论 ≈29 Å）。
@@ -189,12 +202,17 @@ DENSS 是 RAW 原生（numba），`Fast` 模式实测几秒到几十秒就出；
   `FileNotFoundError: <prefix>-damaver-distances.txt`（看着像 DAMAVER 坏了，其实是输入清单错了）；
   ③ `mw_bayes` / `mw_datclass` **没有 `settings` 参数**（签名是 `profile, rg, i0, first, atsas_dir, ...`），
   传 `atsas_dir` 才生效，否则一直报 TypeError 被误当"没装 ATSAS"。
-- **`--dammif-mode Fast` 实测约 8–20 s/模型**（本机 4 模型 ~40 s）；`Slow` 会显著更久，先 Fast 看 χ²，
-  只有要做正式交付才换 Slow 重跑。
-- **χ² 大 = 这组数据还不配做从头建模**，别在重建参数里找答案：本机对照两套数据——bsa DAMMIF 四模型
-  `χ²=2.08 / Rg 28.0 Å / Dmax≈88 Å / MW 63 kDa`、DAMAVER `NSD=0.06`（单一聚类，模型一致，可用）；
-  4LI2-676 同样流程 `χ²=27.7`、DAMAVER 分出 3 个聚类、GNOM Dmax 146 Å（Guinier 只给 15.9 Å）、DENSS 直接失败
-  → 结论是**曲线本身还不够干净**（弱峰 + 无监视器归一 + 低 q 污染），先回去修曲线，不要交付模型。
+- **出珠模要 `Slow`，`Fast` 只能当"探雷"**：本机同一条 bsa 曲线，4 个 `Fast` 模型 DAMAVER 给
+  **NSD = 0.77±0.06、自动分成 2 个簇**（互不一致 → 不能直接平均），换 `Slow` 后 **NSD = 0.09**（单一簇、可用）。
+  代价：`Fast` 约 8–40 s/模型，`Slow` 约 3 min/模型（4 个约 12 min）。顺序应是 Fast 看 χ²、确认数据能建模，
+  再 Slow 出正式交付。
+- **χ² 大 = 这组数据还不配做从头建模**，别在重建参数里找答案。三条实测（同一套流程、同一天）：
+  bsa `χ²=2.08 / Rg 28.0 Å / Dmax≈87 Å / MW 61 kDa / DAMAVER NSD 0.09`（可用）；4LI2-676
+  `χ²=4.87 / Rg 16.3 Å / Dmax≈53 Å / MW 9 kDa / NSD 0.20`（可用）；4DH2-676-apo-3
+  `χ²=4.27 / Rg 25.3 Å / Dmax≈96 Å / MW 28–30 kDa / NSD 0.29`（尚可，模型偏扁平，需与高分辨模型/其他证据对照）。
+- **DENSS 报 `ValueError: The number of derivatives at boundaries does not match: expected 3, got 0+0`**（来自
+  `DENSS.py:4269 regrid_Iq` 的三次样条）= **扣减后曲线已退化**（点数/单调性不足、噪声主导），本机 `4EH2-KDPV-ZN`
+  就是这个报错。这一条与下面的 IFT 问题是一类：**先判数据，再谈重建**。
 - **DENSS 报 `DENSS failed to run properly` / `IndexError: index -1 is out of bounds ... labeled_support == feature` = 它的输入 IFT 不可用**，不是 DENSS 参数没调好：那个下标来自 `DENSS.py:1931` —— 收缩包络把 support 压成**空**（`num_features == 0`）时 `sums` 长度为 0。
   根因几乎总是 IFT 被低 q 拖出**离谱的 Dmax**（本机 4LI2-676 实测：Guinier Rg=15.9 Å，BIFT 却给 Dmax=189–357 Å，
   DENSS 盒子 side>1000 Å、密度摊薄 → 塌陷）。处置顺序：① 先把 q 裁到 qRg_min ≈ 0.4–0.5（`--trim-qmin`）；
@@ -202,10 +220,23 @@ DENSS 是 RAW 原生（numba），`Fast` 模式实测几秒到几十秒就出；
   ③ 只在 ① ② 之后才考虑 DENSS 自己的步骤/盒子参数。**不要在 IFT 坏的时候去调 DENSS 参数。**
 - **`models/` 空着 = 没跑 `shape` 步，或缺 ATSAS 又被当成"珠模出不来就什么都不出"**：正确姿势是
   `--model-engine auto` —— 电子云（DENSS）总出，珠模（DAMMIF）有 ATSAS 才出；两者都缺才叫失败。
+- **帧区间是 0 基闭区间，`end` 给到帧数就会 `IndexError`**：`445` 帧的系列写 `--buffer-range "60,220;400,445"`
+  → `SECM.averageFrames` 里 `list index out of range`（本机实测）。脚本现在有 `clip_ranges` 自动收到 `n−1` 并告警，
+  但**区间里的数字仍应自己核对**（峰位置看副产物色谱图最保险）。
+- **判"这条系列能不能用"的硬指标**（任一命中就是数据问题，不是参数问题）：Guinier `Rg < 5 Å` 或 `r² < 0`；
+  `Vp` 为负；逐帧 `Rg` 在几十到几埃之间乱跳；DENSS 建不起样条。本机 `4EH2-KDPV-ZN`（445 帧、无监视器、
+  洗脱事件只抬高 ~3.7%、两种区间都给出 Rg 1.27–1.29 Å）就是这种：**在产物目录写一份
+  `结果不可用-README.md` 说明判定依据**（数据事实 + 试过的区间对照 + 三重证据 + 建议），别让表格里的数字被当结果引用。
+- **脚本被并发编辑时，先 `git status` 再跑，必要时用快照跑**：本机同一仓库有别的会话在改同一个脚本，
+  撞到过两次半成品（`step_ift` 改返回 5 值而 `main` 还解 4；`step_shape` 里 `itf`/`ift` 拼写），
+  两次都是"跑到一半 ValueError/NameError"。稳妥做法：`git log -1` 记下 revision → `cp` 到 scratch 当快照 →
+  跑快照 → 报告里写清用的哪个 sha。
 - **表里 `rg = -1` 不是负数，是 RAW 的失败哨兵值**（该区间的 Guinier 拟合没收敛/点数不够）——按"此区间不可用"读，
   不要当成数值；同理 `r² < 0` 表示拟合比取平均还差。
-- **裁剪坐标是"左下角为原点"**：`row = H−1−y`。裁出来一片均匀背景说明约定错了，别微调数字，回
-  `frame-sequence-to-video` 的重定坐标法。
+- **裁剪坐标：两个轴都从"大的那头"数** → `row = H−1−y`、**`col = W−1−x`**（即 180° 旋转；本机 BL19U2
+  实测标定：`col=x` 时与旧视频帧相关 0.11，`col=W−1−x` 时 0.66，行向扫描峰值恰为 `H−1−y`）。脚本
+  `crop-video-normalized.py` 默认 `--x-origin right`。裁出来一片均匀背景/位置偏移说明约定错了，别微调数字，
+  回 `frame-sequence-to-video` 的"用已接受的旧帧算相关系数"重标法。
 - **ffmpeg 的 libx264 + yuv420p 要求偶数边长**：61×71 的裁块靠整数放大（8×）顺带解决。
 - 视频的 `-pix_fmt rgb24` 必须与写进管道的字节一致（写 RGB 就声明 rgb24），否则帧数会变 3 倍。
 
