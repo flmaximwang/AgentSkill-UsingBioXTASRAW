@@ -137,7 +137,15 @@ python run-raw-tube-pipeline.py --sample-dir <目录> --cfg <日期>.cfg --out-d
 **每个区间一份 `setQrange` 截断后的 profile 副本**（`.dat`）+ 表里 14 列判据，拟合线一律用 RAW 返回的 Rg/I0 画。
 脚本自己只做**残差统计**（`chi2_red` 与 smile/frown 符号），不做拟合。
 
-完成标准：`summary.json` 里每个节点都有值或明确的失败原因；`profiles/04_guinier/` 的份数 = 表里的区间数。
+完成标准：`summary.json` 里每个节点都有值或明确的失败原因；`profiles/04_guinier/` 的份数 = 表里的区间数；
+产物根里有一份 **`README.md`**（`readme_for_run.py` 生成，随每次运行刷新）。
+
+**每个结果文件夹必须能"自己讲清楚"**：`README.md` 按固定顺序写
+① 一句话结论（能不能用/低 q 可不可信/P(r) 与 3D 有没有）② 关键结果表（每格都带"怎么看"）
+③ 里面每个文件是什么、什么时候看 ④ 每个数字的判据（好/勉强/不可信）
+⑤ 这次没做的事与原因（IFT 没过闸门 → 没 P(r)；DENSS 失败；`--model-engine none`）
+⑥ 怎么自己复核（workspace 怎么开、表在哪、怎么重跑）。
+单独补跑某次 README（不重算）：`readme_for_run.py <结果目录>`。
 
 ### Step 2 — 一批样品一起跑 + 汇总（整条稀释序列/整批数据）
 
@@ -149,7 +157,7 @@ for d in "$RAW"/*/; do               # 3 个并行足够（BIFT 单进程、DENS
     --out-dir "$PRO/$(basename "$d")" --model-engine denss --denss-mode Fast \
     > "$PRO/_logs/$(basename "$d").log" 2>&1
 done
-python summarize-tube-run.py "$PRO"        # → $PRO/_summary/summary.csv + summary.md
+python summarize-tube-run.py "$PRO"        # → $PRO/README.md（整批说明）+ _summary/summary.{csv,md}
 python plot-tube-overview.py "$PRO"        # → $PRO/_summary/overview.png
 ```
 

@@ -521,23 +521,32 @@ def plots(ctx, sub, rows, rec, ift, sweep=None):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     q, I, E = sub.getQ(), sub.getI(), sub.getErr()
+
+    def _m(i, e, positive=False):
+        """matplotlib refuses negative yerr and can't log-plot non-positive I."""
+        i, e = np.asarray(i, float), np.asarray(e, float)
+        ok = np.isfinite(i) & np.isfinite(e) & (e >= 0)
+        return ok & (i > 0) if positive else ok
+
     fig = plt.figure(figsize=(15, 10))
     ax = fig.add_subplot(2, 3, 1)
-    ax.errorbar(q, I, yerr=E, fmt=".-", ms=2)
+    m = _m(I, E, positive=True)
+    ax.errorbar(q[m], I[m], yerr=E[m], fmt=".-", ms=2)
     ax.set_xscale("log"); ax.set_yscale("log"); ax.set_xlabel("q (1/A)"); ax.set_ylabel("I")
     ax.set_title("subtracted (log-log)")
     ax = fig.add_subplot(2, 3, 2)
-    ax.errorbar(q, q ** 2 * I, yerr=q ** 2 * E, fmt=".-", ms=2)
+    m = _m(I, E)
+    ax.errorbar(q[m], (q ** 2 * I)[m], yerr=(q ** 2 * E)[m], fmt=".-", ms=2)
     ax.set_xlabel("q"); ax.set_ylabel("q^2 I"); ax.set_title("Kratky")
     ax = fig.add_subplot(2, 3, 3)
     for r in rows:
         if "failed" in r:
             continue
-        m = (q >= r["qmin"]) & (q <= r["qmax"])
+        m = (q >= r["qmin"]) & (q <= r["qmax"]) & _m(I, E, positive=True)
         ax.errorbar(q[m] ** 2, np.log(I[m]), fmt=".", ms=2, alpha=0.25)
     if rec:
-        m = (q >= rec["qmin"]) & (q <= rec["qmax"])
-        ax.errorbar(q[m] ** 2, np.log(I[m]), yerr=E[m] / I[m], fmt="o", ms=3,
+        m = (q >= rec["qmin"]) & (q <= rec["qmax"]) & _m(I, E, positive=True)
+        ax.errorbar(q[m] ** 2, np.log(I[m]), yerr=(E / I)[m], fmt="o", ms=3,
                     label="recommended")
         xx = np.linspace(0, rec["qmax"] ** 2, 10)
         ax.plot(xx, np.log(rec["i0"]) - xx * rec["rg"] ** 2 / 3, "r-")
@@ -545,11 +554,16 @@ def plots(ctx, sub, rows, rec, ift, sweep=None):
     ax.set_xlabel("q^2"); ax.set_ylabel("ln I"); ax.set_title("Guinier fan (all ranges)")
     if ift is not None:
         ax = fig.add_subplot(2, 3, 4)
-        ax.errorbar(ift.r, ift.p, yerr=ift.err, fmt=".-", ms=2)
+        m = _m(ift.p, ift.err)
+        ax.errorbar(np.asarray(ift.r)[m], np.asarray(ift.p)[m], yerr=np.asarray(ift.err)[m],
+                    fmt=".-", ms=2)
         ax.set_xlabel("r (A)"); ax.set_ylabel("P(r)"); ax.set_title("P(r) [RAW BIFT]")
         ax = fig.add_subplot(2, 3, 5)
-        ax.errorbar(ift.q_orig, ift.i_orig, yerr=ift.err_orig, fmt=".", ms=2, label="data")
-        ax.plot(ift.q_orig, ift.i_fit, "-", label="IFT fit")
+        m = _m(ift.i_orig, ift.err_orig, positive=True)
+        ax.errorbar(np.asarray(ift.q_orig)[m], np.asarray(ift.i_orig)[m],
+                    yerr=np.asarray(ift.err_orig)[m], fmt=".", ms=2, label="data")
+        mf = np.isfinite(np.asarray(ift.i_fit, float)) & (np.asarray(ift.i_fit, float) > 0)
+        ax.plot(np.asarray(ift.q_orig)[mf], np.asarray(ift.i_fit)[mf], "-", label="IFT fit")
         ax.set_xscale("log"); ax.set_yscale("log"); ax.set_xlabel("q"); ax.set_ylabel("I")
         ax.legend(fontsize=8); ax.set_title("IFT fit")
     if sweep:
@@ -601,6 +615,7 @@ def main():
                          "control scaling, subtract, multi-range Guinier) always runs")
     args = ap.parse_args()
     steps = {s.strip() for s in args.steps.split(",") if s.strip()}
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # for readme_for_run
 
     sample_dir = os.path.abspath(os.path.expanduser(args.sample_dir))
     key = args.sample_key or os.path.basename(sample_dir.rstrip("/"))
@@ -645,14 +660,26 @@ def main():
         node_report(ctx, sub, ift)
     if "workspace" in steps:
         node_workspace(ctx, sub, ift, key)
-    plots(ctx, sub, rows, rec, ift, sweep)
-    jdump(dict(sample=key, sample_dir=sample_dir, cfg=args.cfg, subtraction=sub_info,
+    ctl_runs = sorted({"_".join(os.path.basename(f).split("_")[:2]) for f in ctl_files})
+    jdump(dict(sample=key, sample_dir=sample_dir, cfg=args.cfg, command=" ".join(sys.argv),
+               control_runs={r: 0 for r in ctl_runs}, subtraction=sub_info,
                guinier_auto=dict(rg=float(auto[0]), qmin=float(auto[4]), qmax=float(auto[5]),
                                  r_sqr=float(auto[10])),
                guinier_recommended=rec, ift=ift_res, ift_dmax_sweep=sweep, mw=mw,
                shape=denss_res, n_frames=len(sam_files) + len(ctl_files),
                n_frame_outliers=sum(1 for r in frames if r.get("outlier"))),
           os.path.join(ctx.out, "summary.json"))
+    # human-readable guide to this result folder (批处理时每个样品一份)
+    try:
+        import readme_for_run
+        readme_for_run.write_readme(ctx.out)
+        log("README.md -> %s (结果说明与判据)" % os.path.join(ctx.out, "README.md"))
+    except Exception as e:                                   # never fail a run over this
+        log("WARNING: README.md not written: %s" % e)
+    try:                            # figures come last: a plotting error must not lose numbers
+        plots(ctx, sub, rows, rec, ift, sweep)
+    except Exception as e:
+        log("WARNING: plots failed (%s) - summary.json / README.md are already on disk" % e)
     log("done -> %s" % ctx.out)
 
 
