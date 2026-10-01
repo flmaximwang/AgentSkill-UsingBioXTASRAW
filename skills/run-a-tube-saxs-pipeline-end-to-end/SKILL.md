@@ -108,8 +108,9 @@ python run-raw-tube-pipeline.py --sample-dir <目录> --cfg <日期>.cfg --out-d
   [--sample-key <样品前缀>] [--control-key ddh2o,pb7] \
   [--scale-window 0.30 0.44] [--no-scale] \
   [--qrg-max 1.3] [--snr-min 2.0] [--ift-sweep 5] \
-  [--model-engine denss|dammif|auto|none] [--denss-mode Fast|Slow] [--symmetry 0] \
-  [--atsas-dir <ATSAS>/bin] [--save-frames] [--steps integrate,average,subtract,guinier,ift,mw,shape,report,workspace]
+  [--model-engine none|denss] [--denss-mode Fast|Slow] [--symmetry 0] \
+  [--atsas-dir <ATSAS>/bin] [--save-frames] \
+  [--steps ift,mw,shape,report,workspace]      # 主干（积分/平均/缩放/扣减/多区间 Guinier）总是跑
 ```
 
 内部只调 `bioxtasraw.RAWAPI`（= GUI 面板背后的同一套实现）：
@@ -121,9 +122,9 @@ python run-raw-tube-pipeline.py --sample-dir <目录> --cfg <日期>.cfg --out-d
 | control 相对缩放 | `scaleRelative(f)` | `profiles/01_control/control_avg_scaled.dat` |
 | 扣减 | `subtract()` | `profiles/03_subtracted/subtracted.dat` |
 | 多区间 Guinier | `auto_guinier` + `guinier_fit(idx_min, idx_max)` | `profiles/04_guinier/guinier_<qlo>-<qhi>.dat` × N + `recommended_range.dat`、`tables/guinier_multi_range.csv` + `guinier_results.json` |
-| IFT / P(r) | `bift(idx_min, idx_max, settings)`（设 `minDmax/maxDmax/DmaxPoints/PrPoints`） | `ifts/bift.ift`、`ifts/pr.dat`、`ifts/ift_fit.dat`、`tables/ift_summary.csv`（+ `ift_dmax_sweep.csv`） |
+| IFT / P(r) | `bift(idx_min, idx_max, settings)`（设 `minDmax/maxDmax/DmaxPoints/PrPoints`）**跑两次**：起点=分析窗起点 / 起点=Guinier 拟合自己的起点；按闸门挑可信的一次 | `ifts/bift.ift`、`ifts/pr.dat`、`ifts/ift_fit.dat`、`tables/ift_summary.csv`（两次都给）+ `ift_dmax_sweep.csv`（`--ift-sweep N`） |
 | 分子量 | `mw_vp` / `mw_vc`（+ ATSAS 时 `mw_bayes`/`mw_datclass`） | `tables/mw.csv` |
-| 3D | `denss`（原生）/ `dammif`（需 ATSAS） | `models/denss.mrc`(+support/stats)、`tables/shape_results.json` |
+| 3D | `denss`（原生，唯一内置；**IFT 不可信时直接跳过**，不拿坏 P(r) 去建模型）/ `dammif`（ATSAS，GUI 里跑） | `models/denss.mrc`(+support/stats)、`tables/shape_results.json` |
 | 报告 / 工作区 | `save_report` / `save_workspace` | `reports/raw_report.pdf`、`<样品>_workspace.hdf5`（GUI 直接打开看） |
 | 总览图 | matplotlib（只画 RAW 返回的数与拟合线） | `qc.png`（log-log / Kratky / Guinier fan / P(r) / IFT fit / Dmax sweep）、`summary.json` |
 

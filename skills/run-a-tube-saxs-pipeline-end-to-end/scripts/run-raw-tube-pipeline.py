@@ -293,43 +293,85 @@ def node_guinier(ctx, sub, qmax_idx, r_gate_qrg, min_pts=10, chi2_max=3.0,
 
 # --------------------------------------------------------------- node 6: IFT / P(r)
 def node_ift(ctx, sub, rec, i0, i1, dmax_scale=3.1, dmax_pts=10):
+    """Run RAW's BIFT twice - once from the start of the analysis window, once from the
+    Guinier fit's own start index - then keep the trusted one.
+
+    Why both: BIFT's minDmax/maxDmax only bound the *grid search*; the joint optimiser may
+    return a much larger Dmax (RAWAPI.bift docstring: "The value of Dmax can go beyond this
+    bound in the optimization step").  Feeding the contaminated low-q points in is what makes
+    it run away (measured: A5-05-6 gave Dmax=741 A from a 48-109 A window, chisq 1.09 - a
+    perfect-looking fit to a meaningless P(r)).  RAW's own hint is `use_guinier_start`, i.e.
+    start the IFT where the Guinier fit says the data become usable.
+    """
     rg = rec["rg"] if rec else raw.auto_guinier(sub, settings=ctx.s)[0]
-    ctx.set("minDmax", max(10.0, 0.7 * dmax_scale * rg))
-    ctx.set("maxDmax", max(30.0, 1.6 * dmax_scale * rg))
+    lo, hi = max(10.0, 0.7 * dmax_scale * rg), max(30.0, 1.6 * dmax_scale * rg)
+    ctx.set("minDmax", lo)
+    ctx.set("maxDmax", hi)
     ctx.set("DmaxPoints", dmax_pts)
     ctx.set("PrPoints", 100)
-    log("IFT: q idx %d-%d, Dmax search %.0f-%.0f A, 1.6xRg upper bound"
-        % (i0, i1, max(10.0, 0.7 * dmax_scale * rg), max(30.0, 1.6 * dmax_scale * rg)))
-    t = time.time()
-    res = raw.bift(sub, idx_min=i0, idx_max=i1, settings=ctx.s, single_proc=True)
-    ift, dmax, rgr, i0r, dmax_e, rgr_e, i0r_e, chisq = (
-        res[0], res[1], res[2], res[3], res[4], res[5], res[6], res[7])
-    ok = ift is not None and dmax > 0
-    out = dict(dmax=float(dmax), dmax_err=float(dmax_e), rg_realspace=float(rgr),
-               rg_err=float(rgr_e), i0=float(i0r), chisq=float(chisq), ok=bool(ok),
-               seconds=time.time() - t)
-    if ok:
+
+    starts = [(i0, "window-start")]
+    if rec and rec["idx_min"] > i0:
+        starts.append((rec["idx_min"], "guinier-fit-start"))
+
+    rows, ifts = [], {}
+    for idx_min, tag in starts:
+        log("IFT [%s]: q idx %d-%d, Dmax grid %.0f-%.0f A" % (tag, idx_min, i1, lo, hi))
+        t = time.time()
+        res = raw.bift(sub, idx_min=idx_min, idx_max=i1, settings=ctx.s, single_proc=True)
+        ift = res[0]
+        if ift is None or not (res[1] > 0):
+            rows.append(dict(tag=tag, idx_min=idx_min, failed="BIFT returned no solution"))
+            log("  failed")
+            continue
+        dmax, rgr, i0r, dmax_e, rgr_e = res[1], res[2], res[3], res[4], res[5]
+        chisq = res[7]
+        gates = dict(rg_vs_guinier=abs(rgr - rg) / rg <= 0.10,
+                     dmax_over_rg=(dmax / rg) <= 4.5,
+                     dmax_within_grid=(dmax <= 1.5 * hi))
+        row = dict(tag=tag, idx_min=idx_min, qmin=float(sub.getQ()[idx_min]), qmax=float(sub.getQ()[i1]),
+                   dmax=float(dmax), dmax_err=float(dmax_e), rg_realspace=float(rgr),
+                   rg_err=float(rgr_e), i0=float(i0r), chisq=float(chisq),
+                   seconds=time.time() - t, gates=gates, trusted=all(gates.values()))
+        rows.append(row)
+        ifts[tag] = ift
+        log("  Dmax=%.1f+-%.1f  Rg(real)=%.1f  chisq=%.2f  trusted=%s  %s  (%.0fs)"
+            % (dmax, dmax_e, rgr, chisq, row["trusted"], gates, row["seconds"]))
+
+    trusted = [r for r in rows if r.get("trusted")]
+    best = (min(trusted, key=lambda r: r["chisq"]) if trusted
+            else (min([r for r in rows if "failed" not in r], key=lambda r: r["chisq"])
+                  if any("failed" not in r for r in rows) else None))
+    out = dict(runs=rows, chosen=best["tag"] if best else None,
+               trusted=bool(best and best.get("trusted")))
+    if not best:
+        log("IFT: no usable solution - 3D will be skipped")
+    elif not best.get("trusted"):
+        log("IFT: no *trusted* solution (see gates); best is %s - 3D will be skipped and the "
+            "P(r) must not be reported" % best["tag"])
+    ift = ifts.get(best["tag"]) if best else None
+    if ift is not None:
         raw.save_ift(ift, "bift.ift", os.path.join(ctx.out, "ifts"))
         np.savetxt(os.path.join(ctx.out, "ifts", "pr.dat"),
                    np.column_stack([ift.r, ift.p, ift.err]),
-                   header="r(A)\tP(r)\terr\t[RAW BIFT]")
+                   header="r(A)\tP(r)\terr\t[RAW BIFT, start=%s]" % best["tag"])
         np.savetxt(os.path.join(ctx.out, "ifts", "ift_fit.dat"),
                    np.column_stack([ift.q_orig, ift.i_orig, ift.err_orig, ift.i_fit]),
                    header="q\tI_measured\terr\tI_fit(BIFT)")
-        out["gates"] = dict(chisq_1_to_10=(1.0 <= chisq <= 10.0),
-                            rg_vs_guinier=abs(rgr - rg) / rg <= 0.10,
-                            dmax_over_rg=(dmax / rg) <= 4.5)
-        log("  Dmax=%.1f+-%.1f  Rg(realspace)=%.1f  chisq=%.2f  gates=%s (%.0fs)"
-            % (dmax, dmax_e, rgr, chisq, out["gates"], out["seconds"]))
-    else:
-        log("  BIFT failed (%.0fs)" % out["seconds"])
     jdump(out, os.path.join(ctx.out, "tables", "ift_summary.json"))
     with open(os.path.join(ctx.out, "tables", "ift_summary.csv"), "w") as fh:
-        fh.write("method,Dmax,Dmax_err,Rg_realspace,Rg_err,I0,chisq,seconds\n")
-        if ok:
-            fh.write("BIFT,%.2f,%.2f,%.2f,%.2f,%.2f,%.4f,%.0f\n" % (
-                dmax, dmax_e, rgr, rgr_e, i0r, chisq, out["seconds"]))
-    return (ift if ok else None), out
+        fh.write("tag,idx_min,qmin,qmax,Dmax,Dmax_err,Rg_realspace,Rg_err,I0,chisq,"
+                 "pass_rg,pass_dmax_over_rg,pass_dmax_within_grid,trusted,seconds\n")
+        for r in rows:
+            if "failed" in r:
+                fh.write("%s,%d,-,-,-,-,-,-,-,-,,,,,0\n" % (r["tag"], r["idx_min"]))
+                continue
+            g = r["gates"]
+            fh.write("%s,%d,%.5f,%.5f,%.2f,%.2f,%.2f,%.2f,%.2f,%.4f,%d,%d,%d,%d,%.0f\n"
+                     % (r["tag"], r["idx_min"], r["qmin"], r["qmax"], r["dmax"], r["dmax_err"],
+                        r["rg_realspace"], r["rg_err"], r["i0"], r["chisq"], g["rg_vs_guinier"],
+                        g["dmax_over_rg"], g["dmax_within_grid"], r["trusted"], r["seconds"]))
+    return (ift if (best and best.get("trusted")) else None), out
 
 
 def node_ift_sweep(ctx, sub, i0, i1, rg, n=5, span=0.35):
@@ -390,27 +432,17 @@ def node_mw(ctx, sub, vp_mw=None):
 
 
 # -------------------------------------------------------------------- node 8: 3D
-def node_shape(ctx, ift, engine="auto", mode="Fast", n_electrons=None, symmetry=0,
+def node_shape(ctx, ift, engine="denss", mode="Fast", n_electrons=None, symmetry=0,
                n_models=1):
-    if ift is None:
-        log("3D: skipped (no IFT)")
+    """3D node.  Only DENSS is available here: it is the sole solver bundled with RAW and
+    it accepts BIFT or GNOM IFTs.  DAMMIF/DAMMIN are ATSAS executables (bead models) and
+    only eat GNOM .out IFTs - run those from the RAW GUI (Tools -> ATSAS) once ATSAS is
+    installed; this script does not fake that path."""
+    if engine == "none" or ift is None:
+        log("3D: skipped (%s)" % ("no IFT" if ift is None else "engine=none"))
         return None
-    use_dammif = engine in ("auto", "dammif") and ctx.has_atsas
-    if engine == "dammif" and not ctx.has_atsas:
-        log("3D: DAMMIF requested but ATSAS not found -> falling back to DENSS")
-        use_dammif = False
-    if engine == "none":
-        return None
-    out = {}
-    if use_dammif:
-        # DAMMIF only eats GNOM IFTs -> needs ATSAS gnom first
-        try:
-            dmax = raw.auto_dmax(ift, settings=ctx.s) if hasattr(raw, "auto_dmax") else None
-        except Exception:
-            dmax = None
-        log("3D: DAMMIF needs a GNOM .out IFT; run GNOM first (ATSAS). engine=%s" % engine)
-        out["dammif"] = "requires ATSAS gnom IFT - not run"
-    # DENSS is RAW-native and accepts BIFT or GNOM IFTs
+    out = {"dammif": ("not run - requires ATSAS (gnom IFT + dammif binary); use the RAW GUI "
+                      "or extend this script once ATSAS is installed")}
     os.makedirs(os.path.join(ctx.out, "models"), exist_ok=True)
     t = time.time()
     try:
@@ -522,14 +554,18 @@ def main():
     ap.add_argument("--qrg-max", type=float, default=1.3, help="Guinier gate on q*Rg")
     ap.add_argument("--snr-min", type=float, default=2.0, help="I/err cut for the q window")
     ap.add_argument("--ift-sweep", type=int, default=0, help="sweep Dmax over N values")
-    ap.add_argument("--model-engine", default="denss", choices=["none", "denss", "dammif", "auto"])
+    ap.add_argument("--model-engine", default="denss", choices=["none", "denss"],
+                    help="3D back-end.  DENSS is the only solver bundled with RAW; DAMMIF "
+                         "needs ATSAS - run it from the RAW GUI (Tools -> ATSAS) or ask for "
+                         "the GNOM+DAMMIF path to be added once ATSAS is installed")
     ap.add_argument("--denss-mode", default="Fast", choices=["Fast", "Slow", "Custom"])
     ap.add_argument("--symmetry", type=int, default=0, help="n-fold symmetry for DENSS")
     ap.add_argument("--n-models", type=int, default=1, help="DAMMIF models (needs ATSAS)")
     ap.add_argument("--atsas-dir", default=None, help="ATSAS bin directory (enables GNOM/DAMMIF)")
     ap.add_argument("--save-frames", action="store_true", help="write every frame as .dat")
-    ap.add_argument("--steps", default="integrate,average,subtract,guinier,ift,mw,shape,report,workspace",
-                    help="comma separated subset of the pipeline nodes")
+    ap.add_argument("--steps", default="ift,mw,shape,report,workspace",
+                    help="optional nodes to run; the backbone (integrate, average, "
+                         "control scaling, subtract, multi-range Guinier) always runs")
     args = ap.parse_args()
     steps = {s.strip() for s in args.steps.split(",") if s.strip()}
 
@@ -570,7 +606,7 @@ def main():
             ne = int(round(vp * 537))       # ~0.537 electrons per Da (protein)
             log("  DENSS n_electrons from Vp MW %.1f kDa -> %d" % (vp, ne))
         denss_res = node_shape(ctx, ift, engine=args.model_engine, mode=args.denss_mode,
-                               n_electrons=ne, symmetry=args.symmetry, n_models=args.n_models)
+                               n_electrons=ne, symmetry=args.symmetry)
     if "report" in steps:
         node_report(ctx, sub, ift)
     if "workspace" in steps:

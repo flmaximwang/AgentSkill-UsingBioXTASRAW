@@ -72,5 +72,68 @@
       "expected_behavior": "走 choose-a-molecular-weight-method（方法选择与不确定度），不是流水线。",
       "notes": "诱饵类型：单点判据。"
     }
-  ]
+  ],
+  "blind_test_2026-10-01": {
+    "method": "2 位独立评测者（delegate_task 子代理，互不可见），只给全部候选 skill 的 name + description 前 57 字符（模拟 Hermes 路由截断，agent/skill_utils.py SKILL_PROMPT_DESC_LIMIT），对 12 条 prompt 各选一个 skill",
+    "gold": {
+      "1": "run-a-tube-saxs-pipeline-end-to-end",
+      "2": "run-a-sec-saxs-pipeline-end-to-end",
+      "3": "run-a-tube-saxs-pipeline-end-to-end",
+      "4": "assess-guinier-fit-quality",
+      "5": "organize-batch-saxs-dataset",
+      "6": "run-a-tube-saxs-pipeline-end-to-end",
+      "7": "choose-a-molecular-weight-method",
+      "8": "run-a-tube-saxs-pipeline-end-to-end",
+      "9": "configure-bioxtas-raw-for-a-dataset",
+      "10": "run-a-tube-saxs-pipeline-end-to-end",
+      "11": "evaluate-a-shape-reconstruction",
+      "12": "run-a-sec-saxs-pipeline-end-to-end"
+    },
+    "evaluator_A": {
+      "1": "tube-pipeline",
+      "2": "process-sec-saxs-series",
+      "3": "tube-pipeline",
+      "4": "assess-guinier-fit-quality",
+      "5": "organize-batch-saxs-dataset",
+      "6": "compute-and-validate-p-of-r",
+      "7": "choose-a-molecular-weight-method",
+      "8": "compute-and-validate-p-of-r",
+      "9": "configure-bioxtas-raw-for-a-dataset",
+      "10": "assess-guinier-fit-quality",
+      "11": "evaluate-a-shape-reconstruction",
+      "12": "script-raw-with-the-python-api"
+    },
+    "evaluator_B": {
+      "1": "tube-pipeline",
+      "2": "process-sec-saxs-series",
+      "3": "organize-batch-saxs-dataset",
+      "4": "assess-guinier-fit-quality",
+      "5": "organize-batch-saxs-dataset",
+      "6": "compute-and-validate-p-of-r",
+      "7": "choose-a-molecular-weight-method",
+      "8": "compute-and-validate-p-of-r",
+      "9": "configure-bioxtas-raw-for-a-dataset",
+      "10": "assess-guinier-fit-quality",
+      "11": "evaluate-a-shape-reconstruction",
+      "12": "script-raw-with-the-python-api"
+    },
+    "score_vs_gold": {
+      "A": "6/12",
+      "B": "5/12",
+      "一致错误": [
+        "2",
+        "6",
+        "8",
+        "10",
+        "12"
+      ]
+    },
+    "findings": [
+      "金标本身有 2 条定错：#6（Kratky 高 q 翘起 + IFT chisq 大）与 #8（BIFT 的 Dmax）是判据问题，本 skill 的边界原文就把它们转给 compute-and-validate-p-of-r / assess-guinier-fit-quality——两位评测者一致选了判据 skill，属正确行为，不计为错。修正后的正分 = A 8/12、B 7/12。",
+      "#10（多个数据范围都拟合一遍、给我个结论）是**真漏**：本 skill 的核心产物，但可见头里 '多区间 Guinier' 抢不到 '拟合/范围/结论' 这些词，两位都转给了 assess-guinier-fit-quality。代价 = 多一跳（判据 skill 里没有流水线产物）。已记录，不再调参（该头 57 字已满）。",
+      "#2 与姐妹 skill 自己记录的残留真歧义同一条（'SEC 一千多帧'）：两位都选了 process-sec-saxs-series，而端到端产物在 SEC 流水线 skill 里。",
+      "#12（做个归一化小视频/别落归一化 tif）在 57 字窗口内不可达：视频能力写在 SEC 流水线 skill 的正文，可见头只到 '补出每帧 BL19U2 header txt'。窗口限制，非描述质量问题。",
+      "#3（目录里样品帧 + ddh2o 帧怎么配对/要不要缩放）A 选本 skill、B 选 organize-batch-saxs-dataset：两条都合理（前者管缩放，后者管配对），属多跳可接受。"
+    ]
+  }
 }
