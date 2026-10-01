@@ -120,7 +120,8 @@ python run-raw-sec-pipeline.py --series-dir <tif 目录> --out-dir <产物根> -
   [--steps integrate,series,guinier,ift,mw,shape,report] \
   [--buffer-range "s,e[;s,e]"] [--sample-range s,e] [--baseline none|linear|integral] \
   [--trim-qmin q] \
-  [--guinier-ranges "qlo:qhi,..."] [--model-engine auto|dammif|denss|none] \
+  [--guinier-ranges "qlo:qhi,..."] \
+  [--model-engine auto|denss|dammif|both|none] [--denss-mode Fast|Slow|Custom] \
   [--n-models 4] [--symmetry P1] [--atsas-dir <ATSAS>/bin]
 ```
 
@@ -136,8 +137,11 @@ python run-raw-sec-pipeline.py --series-dir <tif 目录> --out-dir <产物根> -
 | 多区间 Guinier | `auto_guinier` + `guinier_fit(idx_min, idx_max)` | `profiles/06_guinier/guinier_<标签>.dat`、`tables/guinier_multi_range.csv` + `.png` |
 | IFT | `bift`（原生）/ `auto_dmax`+`gnom`（需 ATSAS） | `ifts/<前缀>_bift.ift` / `_gnom.out`、`tables/ift_summary.csv` |
 | 分子量 | `mw_vc` / `mw_vp` / `mw_bayes` | `tables/mw.csv` |
-| 形状重建 | `dammif`(+`damaver`)（需 ATSAS）或 `denss`（原生） | `models/*.pdb` / `*.mrc` |
+| 形状重建 | `denss`（**电子云，RAW 原生，默认总跑**）+ `dammif`/`damaver`（**珠模，有 ATSAS 才跑**） | `models/<前缀>_denss.mrc`（+`_support.mrc`/`_map.fit`/`_stats_by_step.dat`/`_denss.log`）；有 ATSAS 时另有 `models/<前缀>_dammif_*.pdb` + `_damaver` |
 | 报告 | `save_report(pdf, dir, profiles, ifts, series)` | `reports/<前缀>_raw_report.pdf` |
+
+**形状重建两个都要**（`--model-engine auto`）：**电子云（DENSS，`.mrc`）与珠模（DAMMIF，`.pdb`）是同一份 IFT 的两种重建，互不替代**——
+DENSS 是 RAW 原生（numba），`Fast` 模式实测几秒到几十秒就出；DAMMIF 是 ATSAS 可执行文件的外壳，**没装 ATSAS 时自动只出电子云**（并在日志里明说），不要因此把 `models/` 留空。
 
 **多区间 Guinier 是"让用户复核拟合过程"的主产物**：不传 `--guinier-ranges` 时，脚本以 `auto_guinier` 的 Rg 为锚
 铺一条跨判据边界的阶梯（qRg 0.3–0.6 / 0.4–0.8 / 0.5–1.0 / 0.6–1.3），每个区间**一份 profile 副本**
@@ -178,6 +182,8 @@ python run-raw-sec-pipeline.py --series-dir <tif 目录> --out-dir <产物根> -
   换成峰前+峰后两段后落到 **23.7–27.4 Å、r² 0.91–0.99**（BSA 单体理论 ≈29 Å）。
 - **低 q 被寄生散射污染会把 IFT 的 Dmax 拖到离谱值**：同一曲线未裁 q 时 BIFT 给 **Dmax=417 Å / Rg=149 Å**。
   用 `--trim-qmin 0.017` 显式裁掉低 q 段（内部就是 RAW 自己的 `setQrange`，不是自写拟合），再跑 IFT/MW。
+- **`models/` 空着 = 没跑 `shape` 步，或缺 ATSAS 又被当成"珠模出不来就什么都不出"**：正确姿势是
+  `--model-engine auto` —— 电子云（DENSS）总出，珠模（DAMMIF）有 ATSAS 才出；两者都缺才叫失败。
 - **表里 `rg = -1` 不是负数，是 RAW 的失败哨兵值**（该区间的 Guinier 拟合没收敛/点数不够）——按"此区间不可用"读，
   不要当成数值；同理 `r² < 0` 表示拟合比取平均还差。
 - **裁剪坐标是"左下角为原点"**：`row = H−1−y`。裁出来一片均匀背景说明约定错了，别微调数字，回

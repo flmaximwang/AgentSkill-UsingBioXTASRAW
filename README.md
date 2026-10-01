@@ -78,13 +78,14 @@ done
 |---|---|---|
 | `scripts/emit-bl19u2-header-txt.py` | 监视器 + 采集日志 → **每帧 BL19U2 header txt**（`Transmitted_Beam` = 该帧曝光窗口内监视器中位数），写到源目录与 tif 并排 | 2000 帧全出；监视器 19651 行 ≙ 9.83 采样/帧（**行≠帧**，必须按时间窗口取）；开头 5 个 `~1e-13` 野值按 5% 中位阈值丢弃；lag 自动扫出 **−32 帧 ≈ −48 s，corr 0.869**；逐帧因子全在 ±5% 内 |
 | `scripts/crop-video-normalized.py` | 裁剪区（左下原点坐标）→ **读入时乘归一化因子** → rawvideo 管道给 ffmpeg；不落归一化 tif | 试片 120 帧 / 0.5 MB / 8× / 20 fps，`frame=120` 核对通过，抽帧确认落在束挡区 |
-| `scripts/run-raw-sec-pipeline.py` | RAWAPI 全程：积分（含逐帧 header 归一化）→ series → buffer/sample 区 → 扣减/基线 → 逐帧 Rg/I0/MW → **多区间 Guinier** → IFT → MW → DAMMIF/DENSS → RAW PDF 报告；**每个节点都落 `.dat`** | 2000 帧积分 ~80 s；`counters.TB` 与 txt 完全一致；开/关归一化的 I(q) 之比 = 1/TB（逐帧 <1e-6 偏差） |
+| `scripts/run-raw-sec-pipeline.py` | RAWAPI 全程：积分（含逐帧 header 归一化）→ series → buffer/sample 区 → 扣减/基线 → 逐帧 Rg/I0/MW → **多区间 Guinier** → IFT → MW → **形状重建（电子云 DENSS 总跑 + 珠模 DAMMIF 有 ATSAS 才跑）** → RAW PDF 报告；**每个节点都落 `.dat`** | 2000 帧积分 ~80 s；`counters.TB` 与 txt 完全一致；开/关归一化的 I(q) 之比 = 1/TB（逐帧 <1e-6 偏差）；DENSS（Fast）实测 ~2 s 出 `.mrc`（bsa：Rg 29.2 Å / support 6.3e5 Å³），本机无 ATSAS → 只出电子云、日志明说 |
 
 真实数据上撞到的两条结论（已写进 skill 的坑与边界）：
 
 - **RAW 的 BL19U2 header 归一化是"内建"的**：`SASFileIO.py:909` 按 `<图像名>.txt` 读 header，
   `NormalizationList=[['/','Transmitted_Beam']]` 逐帧求值（`SASImage.py:366-380`）。线站 `.cfg` 里这套**已经写好了**，
   只差 `ImageHdrFormat` 与 `EnableNormalization` 两个开关 → **不需要写归一化 tif**（省 18 GB）。
+- **形状重建是两件事，不是一件**：电子云（DENSS，`.mrc`，RAW 原生）与珠模（DAMMIF，`.pdb`，ATSAS 可执行文件的外壳）是同一份 IFT 的两种重建——`models/` 空着是错的；没 ATSAS 时先出电子云并在日志明说，装了再补珠模。
 - **`find_buffer_range` 会在"弱峰 + 强漂移"的 SEC 系列上失败**（返回 `success=False`、区间 `None`）：
   本次 BSA 数据的低 q 强度在 50 min 里单调抬升 ~40%（束位/几何漂移，与 `beam-instability` 参考档一致），
   洗脱峰只是骑在漂移上的一个小包（中 q 去漂移后在 **≈第 690 帧**附近 +1~2 个单位，峰宽约 620–760 帧）。

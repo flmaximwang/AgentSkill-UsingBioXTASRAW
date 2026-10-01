@@ -103,7 +103,6 @@ def step_integrate(files, st, out, prefix, limit):
 def step_ranges_and_subtraction(profiles, st, out, prefix, args):
     """buffer 区 → 扣减 →（可选）基线 → sample 区。返回样品平均曲线与 series。"""
     series = raw.profiles_to_series(profiles, st)
-    raw.save_series(series, f"{prefix}_series.hdf5", os.path.join(out, "series"))
 
     # ---- buffer 区
     if args.buffer_range:
@@ -363,21 +362,35 @@ def step_mw(sample_profile, st, out, ift, atsas_dir):
 
 
 def step_shape(ift, ifts, out, prefix, args, atsas_dir):
-    """形状重建：ATSAS 在 → DAMMIF（真珠模）+ DAMAVER；否则 RAW 原生 DENSS（密度图）。"""
+    """形状重建：**电子云（RAW 原生 DENSS）总跑**；**珠模（DAMMIF）仅在有 ATSAS 时跑**。
+
+    两者是同一份 IFT 的两种重建：DENSS 给电子密度图（.mrc），DAMMIF 给 dummy-atom 珠模（.pdb），
+    互不替代——所以默认两个都要，缺 ATSAS 时退化成"只出电子云"。
+    """
     mdir = os.path.join(out, "models")
     os.makedirs(mdir, exist_ok=True)
     engine = args.model_engine
-    if engine == 'auto':
-        engine = 'dammif' if atsas_dir else 'denss'
     if engine == 'none':
         log("形状重建：按参数跳过")
         return
-    if engine == 'dammif':
+    if engine == 'auto':
+        do_denss, do_dammif = True, bool(atsas_dir)
+    else:
+        do_denss = engine in ('denss', 'both')
+        do_dammif = engine in ('dammif', 'both')
+    if do_denss:
+        try:
+            res = raw.denss(ift, f"{prefix}_denss", mdir, mode=args.denss_mode)
+            log(f"  DENSS（电子云）: chi²={res[1]:.2f} Rg={res[2]:.1f} A "
+                f"support_vol={res[3]:.0f} side={res[4]:.1f} A  mode={args.denss_mode}")
+        except Exception as exc:
+            log(f"  ！DENSS 失败：{type(exc).__name__}: {exc}")
+    if do_dammif:
         if not atsas_dir:
-            log("  ！--model-engine dammif 需要 ATSAS（RAW 的 DAMMIF 是 ATSAS 可执行文件的外壳）")
+            log("  ！珠模 DAMMIF 需要 ATSAS（未指定 --atsas-dir）→ 本次只出电子云（DENSS）")
             return
         if itf is None:
-            log("  ！DAMMIF 需要 GNOM 的 IFTM，当前没有 → 跳过")
+            log("  ！DAMMIF 需要 GNOM 的 IFTM，当前没有 → 跳过珠模")
             return
         files = []
         for i in range(args.n_models):
@@ -433,8 +446,10 @@ def main():
                     help="下游分析（Guinier 表/IFT/MW）前丢掉 q 低于此值的点（1/A）；低 q 被寄生散射污染时用")
     ap.add_argument("--guinier-ranges", default=None,
                     help="手工指定多区间 'qlo:qhi,qlo:qhi'（1/A）；默认以 auto Rg 为锚铺 qRg 阶梯")
-    ap.add_argument("--model-engine", choices=["auto", "dammif", "denss", "none"], default="auto",
-                    help="auto：有 ATSAS 走 DAMMIF（珠模），否则走 RAW 原生 DENSS")
+    ap.add_argument("--model-engine", choices=["auto", "denss", "dammif", "both", "none"], default="auto",
+                    help="auto=电子云(DENSS)总跑 + 有 ATSAS 时再加珠模(DAMMIF)；二者可分开指定")
+    ap.add_argument("--denss-mode", choices=["Fast", "Slow", "Custom"], default="Fast",
+                    help="DENSS 模式（Fast 出得快、Slow 收敛更好、耗时更长）")
     ap.add_argument("--n-models", type=int, default=4, help="DAMMIF 模型数")
     ap.add_argument("--symmetry", default="P1", help="DAMMIF 对称性")
     ap.add_argument("--atsas-dir", default=None, help="ATSAS bin 目录（装了就传，RAW 的 GNOM/DAMMIF 需要）")
@@ -485,7 +500,7 @@ def main():
     if "report" in steps and series is not None:
         step_report(profiles, sample_profile, report_profiles, ifts, series, out, prefix)
         try:
-            raw.save_series(series, f"{prefix}_series_final.hdf5", os.path.join(out, "series"))
+            raw.save_series(series, f"{prefix}_series.hdf5", os.path.join(out, "series"))
         except Exception as exc:
             log(f"  ！series 存盘失败：{type(exc).__name__}: {exc}")
 

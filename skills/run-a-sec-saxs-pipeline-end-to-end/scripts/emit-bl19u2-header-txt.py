@@ -15,6 +15,10 @@ txt 里的 `Transmitted_Beam`（`SASImage.integrateCalibrateNormalize` → `calc
 用法：
   python emit-bl19u2-header-txt.py --series-dir <原始 tif 目录> \
       --monitor <系列>_1.Iochamber --log <系列>_00001.log --out-dir <产物目录> [--lag-auto]
+
+若 tif 旁边**已经有线站给的逐帧 txt**（batch/管式模式会给，SEC 模式有时也给），别重生成——用
+`--from-txt-dir <目录>` 只把它们读成 `normalization_factors.csv`（给裁剪视频做逐帧归一化用），
+RAW 那边本来就直接读这些 txt。
 """
 import argparse
 import csv
@@ -142,11 +146,42 @@ def write_header_txt(path, desc, run, frame, exposure, ts, sr, tb, wl, pos="saxs
                             sr=sr, tb=tb, wl=wl, pos=pos))
 
 
+def read_tb_from_txt(path):
+    """从一份 BL19U2 header txt 里取 Transmitted_Beam（找不到就报错，避免静默当成 1.0）。"""
+    for ln in open(path, errors="ignore"):
+        if ln.lower().startswith("transmitted_beam"):
+            return float(ln.split(":", 1)[1].strip())
+    raise SystemExit(f"{path} 里没有 Transmitted_Beam 行")
+
+
+def factors_from_existing_txt(series, txt_dir, n_limit=None):
+    """线站已给逐帧 txt 的情形：只读因子，不写任何 txt。"""
+    tifs = sorted(glob.glob(os.path.join(series, "*.tif")))
+    if not tifs:
+        raise SystemExit(f"{series} 下没有 tif")
+    if n_limit:
+        tifs = tifs[:n_limit]
+    missing = [f for f in tifs
+               if not os.path.exists(os.path.join(txt_dir, os.path.splitext(os.path.basename(f))[0] + ".txt"))]
+    if missing:
+        raise SystemExit(f"{txt_dir} 里缺 {len(missing)} 份 <帧名>.txt（例如 "
+                         f"{os.path.basename(missing[0])[:-4]}.txt）——线站 txt 没配齐，先补齐或用监控器模式生成")
+    rows, tbs = [], []
+    for i, tf in enumerate(tifs):
+        stem = os.path.splitext(os.path.basename(tf))[0]
+        tb = read_tb_from_txt(os.path.join(txt_dir, stem + ".txt"))
+        tbs.append(tb)
+        rows.append((i + 1, stem, "", "", f"{tb:.6e}"))
+    return rows, np.array(tbs)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=FMT)
     ap.add_argument("--series-dir", required=True, help="原始 tif 目录（逐帧 txt 就写在这里，与 tif 并排）")
-    ap.add_argument("--monitor", required=True, help="光强监视器文件（<系列>_1.Iochamber）")
-    ap.add_argument("--log", required=True, help="采集日志（<系列>_00001.log，提供每帧 endTime）")
+    ap.add_argument("--monitor", default=None, help="光强监视器文件（<系列>_1.Iochamber）")
+    ap.add_argument("--log", default=None, help="采集日志（<系列>_00001.log，提供每帧 endTime）")
+    ap.add_argument("--from-txt-dir", default=None,
+                    help="线站已给逐帧 txt 时用：只从该目录读 Transmitted_Beam 生成因子表，不写 txt、不需要 monitor/log")
     ap.add_argument("--out-dir", required=True, help="产物目录（因子表/元数据写到 <out-dir>/norm/）")
     ap.add_argument("--txt-dir", default=None, help="逐帧 txt 的落盘目录（默认 = --series-dir，与 tif 并排）")
     ap.add_argument("--exposure", type=float, default=1.5, help="每帧曝光时长（s）；决定监视器取值窗口宽度")
@@ -173,6 +208,30 @@ def main():
     norm_dir = os.path.join(out, "norm")
     os.makedirs(norm_dir, exist_ok=True)
     os.makedirs(txt_dir, exist_ok=True)
+
+    if args.from_txt_dir:
+        tdir = os.path.abspath(os.path.expanduser(args.from_txt_dir))
+        rows, tbs = factors_from_existing_txt(series, tdir, args.limit)
+        csv_path = os.path.join(norm_dir, "normalization_factors.csv")
+        with open(csv_path, "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["frame", "stem", "endTime_epoch", "monitor_median", "Transmitted_Beam_x1"])
+            w.writerows(rows)
+        spread = float(100 * (np.percentile(tbs, 99) - np.percentile(tbs, 1)) / np.median(tbs))
+        json.dump({"series_dir": series, "txt_dir": tdir, "n_frames": len(rows),
+                   "source": "existing beamline txt (--from-txt-dir)", "tb_median": float(np.median(tbs)),
+                   "tb_rel_spread_pct": spread,
+                   "raw_settings_required": {"ImageHdrFormat": "BL19U2, SSRF", "EnableNormalization": True,
+                                             "NormalizationList": [["/", "Transmitted_Beam"]]}},
+                  open(os.path.join(norm_dir, "normalization_meta.json"), "w"), indent=2, ensure_ascii=False)
+        print(f"=== 用线站已有 txt 生成因子表（不写 txt） ===")
+        print(f"帧数 {len(rows)} | Transmitted_Beam 中位 {np.median(tbs):.4g} | 1–99 百分位相对展宽 {spread:.2f}%")
+        print(f"因子表 : {csv_path}")
+        print(f"元数据 : {norm_dir}/normalization_meta.json")
+        return
+
+    if not args.monitor or not args.log:
+        raise SystemExit("需要 --monitor 与 --log（或改用 --from-txt-dir 读线站已有 txt）")
 
     tifs = sorted(glob.glob(os.path.join(series, "*.tif")))
     if not tifs:
