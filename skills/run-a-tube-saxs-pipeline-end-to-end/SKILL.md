@@ -187,6 +187,12 @@ python plot-tube-overview.py "$PRO"        # → $PRO/_summary/overview.png
   三条闸门判可信（Rg 与 Guinier 对得上、`Dmax ≤ 4.5·Rg`、Dmax 未越出搜索网格 1.5 倍；Guinier 自身没通过闸门时 Rg 那条放宽到 25% 并标 `rg_ref_soft`）；
   **不可信就不建 3D、不报 P(r)**，只留 `ifts/*_untrusted_*.ift` 供目视。修正后同一条数据变成 `Rg_model=22.5 Å / 6.7e4 Å³`。
 - **BIFT 失败的样子**也可能是 `dmax` 顶在搜索域上限、`chisq` 几十：先看 Dmax 域是不是太宽，再看 q 上界是不是把噪声区也喂进去了。
+- **低 q 的前几个点在 beamstop 边缘上**（BL19U2 / Pilatus 2M / D=2680 mm：beamstop 遮到 r≤12 px，r=16 px 处只有 38% 的环未遮挡，
+  r≥25 px 才到 ~75%）。这块区域带着**扣不掉的光束挡边缘光晕**：实测把 q<0.010 砍掉，稀样品 A5-05-4/-5/-6 的"低 q 上翘"
+  I(0.0064)/I(0.0128) 从 6.3/9.3/6.0 掉到 3.5/4.4/3.8（第一个点 I 从 130/124/41 掉到 37/26/12），即**~75-80% 的上翘来自那一个点**。
+  所以：① 报低 q 结论前先看 2D 差分图（是绕着 beamstop 的窄亮环 = 假信号，还是铺开的各向同性光晕 = 真散射）；
+  ② 判"上翘 = 相互作用"之前先确认它随浓度怎么变（相互作用/聚集的信号随稀释**变小**，扣减残留随稀释**变大**）；
+  ③ `--qmin 0.010` 可把这段直接排除。
 - **ATSAS 不在**：`GNOM/DAMMIF/DAMMIN/DATGNOM/DATMW/DATCLASS/CIFSUP/CRYSOL` 全不可用；
   GUI 菜单仍然显示这些项，`Tools → ATSAS → GNOM` 会直接弹 "Can't find ATSAS"（这就是无 ATSAS 的判定点）。
   装好后 `--atsas-dir <ATSAS>/bin` 即可切换；ATSAS 学术免费但要个性化 license。

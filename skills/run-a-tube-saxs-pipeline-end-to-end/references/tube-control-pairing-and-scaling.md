@@ -100,7 +100,11 @@ RAW 默认 `minDmax/maxDmax = 10/400 Å`、`DmaxPoints=10`、`PrPoints=100`。�
 收窄前 `Dmax=400.1 Å / Rg(realspace)=127.7 Å / chisq=32.8`；收窄后 `Dmax=48.4 Å / Rg=18.3 Å / chisq 仍高`。
 `--ift-sweep N` 会扫 Dmax 并落 `tables/ift_dmax_sweep.csv`（看 chisq 谷底的平台）。
 
-**但这个域不是硬边界**：RAWAPI 原文写着 *"The value of Dmax can go beyond this bound in the optimization step"*。
+**低 q 的可用起点**：beamstop 挡到 r≤12 px，`q=0.0064` 对应的 r≈16 px 处只有 ~38% 的环未遮挡（完全未遮挡 ≈90%），
+r≈25 px（q≈0.010）才到 ~75%。第一个数据点因此坐在光束挡边缘，携带一段扣不掉的边缘光晕——实测 `A5-05-5` 的首点 I 从 130 降到 37（砍到 q≥0.010）。
+要做低 q 判断（上翘、Guinier、IFT）先把它砍掉：`--qmin 0.010`。
+
+**这个域不是硬边界**：RAWAPI 原文写着 *"The value of Dmax can go beyond this bound in the optimization step"*。
 实测 `A5-05-6`（最稀那条）在 48–109 Å 的网格下交出 **Dmax=741.4 Å、Rg(realspace)=269 Å、chisq=1.09**，
 而把 IFT 起点从"分析窗起点"换成"Guinier 拟合自己的起点"（idx 78，q≥0.0368）后是 **Dmax=88.9 Å、Rg=25.3 Å、chisq=1.23**。
 两条都"收敛"，只有闸门能分辨：本 skill 因此**跑两次 BIFT**并落 `tables/ift_summary.csv` 两行

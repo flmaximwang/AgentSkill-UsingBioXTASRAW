@@ -169,16 +169,23 @@ def node_average_subtract(ctx, sam, ctl, scale_window=(0.30, 0.44), do_scale=Tru
     return sub, info
 
 
-def pick_analysis_window(sub, snr_min=2.0, qmax_cap=0.35, run=20):
-    """Largest q ending a contiguous run of points with I>0 and I/err >= snr_min."""
+def pick_analysis_window(sub, snr_min=2.0, qmax_cap=0.35, run=20, qmin=0.0):
+    """Largest q ending a contiguous run of points with I>0 and I/err >= snr_min.
+
+    qmin (A^-1) drops the first points: on BL19U2 the beam stop covers r<=12 px and the
+    rings up to ~r 20 px are only partly unmasked, so q <~0.008 sits on the beam-stop edge
+    and carries a beam-stop halo that no background subtraction removes (measured: cutting
+    there removes ~75-80 % of the apparent low-q upturn of the dilute samples).
+    """
     q, I, E = sub.getQ(), sub.getI(), sub.getErr()
     snr = np.divide(I, E, out=np.zeros_like(I), where=E > 0)
     good = (snr >= snr_min) & (I > 0)
+    start = int(np.argmin(abs(q - qmin))) if qmin > 0 else 0
     cap = int(np.argmin(abs(q - qmax_cap)))
     for i in range(cap, -1, -1):
         if good[max(0, i - run + 1):i + 1].all():
-            return 0, i
-    return 0, 0
+            return (start if i - start >= 10 else 0), i
+    return start, start
 
 
 # --------------------------------------------------- node 5: multi-range Guinier
@@ -198,20 +205,22 @@ def _chi2_red(q, I, E, rg, i0, i0idx, i1idx):
 
 
 def node_guinier(ctx, sub, qmax_idx, r_gate_qrg, min_pts=10, chi2_max=3.0,
-                 qrg_rungs=(0.8, 1.0, 1.2, 1.3), start_fracs=(0.05, 0.10, 0.15, 0.20)):
+                 qrg_rungs=(0.8, 1.0, 1.2, 1.3), start_fracs=(0.05, 0.10, 0.15, 0.20),
+                 qmin_idx=0):
     q, I, E = sub.getQ(), sub.getI(), sub.getErr()
     auto = raw.auto_guinier(sub, settings=ctx.s)
     rg0 = auto[0] if auto[0] > 0 else 30.0
 
-    starts = sorted({0,
-                     int(np.argmin(abs(q - auto[4]))) if auto[4] > 0 else 0,
-                     *[int(qmax_idx * f) for f in start_fracs]})
+    starts = sorted({max(qmin_idx, s) for s in (
+        0,
+        int(np.argmin(abs(q - auto[4]))) if auto[4] > 0 else 0,
+        *[int(qmax_idx * f) for f in start_fracs])})
     ends = sorted({int(np.argmin(abs(q - min(qrg / rg0, q[qmax_idx])))) for qrg in qrg_rungs})
 
     rows = []
     for i0 in starts:
         for i1 in ends:
-            if i1 <= i0 or i1 - i0 + 1 < min_pts:
+            if i1 <= i0 or i1 - i0 + 1 < min_pts or i0 < qmin_idx:
                 continue
             try:
                 r = raw.guinier_fit(sub, i0, i1, settings=ctx.s)
@@ -574,6 +583,9 @@ def main():
     ap.add_argument("--no-scale", action="store_true", help="skip the control scale factor")
     ap.add_argument("--qrg-max", type=float, default=1.3, help="Guinier gate on q*Rg")
     ap.add_argument("--snr-min", type=float, default=2.0, help="I/err cut for the q window")
+    ap.add_argument("--qmin", type=float, default=0.0,
+                    help="lowest q used (A^-1); >0 drops the beam-stop-edge points — on this "
+                         "beamline q<~0.009 lies on the beam stop halo (see SKILL.md)")
     ap.add_argument("--ift-sweep", type=int, default=0, help="sweep Dmax over N values")
     ap.add_argument("--model-engine", default="denss", choices=["none", "denss"],
                     help="3D back-end.  DENSS is the only solver bundled with RAW; DAMMIF "
@@ -609,10 +621,11 @@ def main():
     sam, ctl, frames = node_integrate(ctx, sam_files, ctl_files)
     sub, sub_info = node_average_subtract(ctx, sam, ctl, tuple(args.scale_window),
                                           do_scale=not args.no_scale)
-    i0, i1 = pick_analysis_window(sub, snr_min=args.snr_min)
+    i0, i1 = pick_analysis_window(sub, snr_min=args.snr_min, qmin=args.qmin)
+    qmin_idx = int(np.argmin(abs(sub.getQ() - args.qmin))) if args.qmin > 0 else 0
     log("analysis q window: idx %d-%d (q %.4f-%.4f)"
         % (i0, i1, sub.getQ()[i0], sub.getQ()[i1]))
-    auto, rows, rec = node_guinier(ctx, sub, i1, args.qrg_max)
+    auto, rows, rec = node_guinier(ctx, sub, i1, args.qrg_max, qmin_idx=qmin_idx)
     ift, ift_res, sweep, denss_res = None, None, None, None
     if "ift" in steps:
         ift, ift_res = node_ift(ctx, sub, rec, i0, i1)
