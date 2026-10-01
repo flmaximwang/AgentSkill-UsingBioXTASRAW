@@ -71,17 +71,29 @@ def runmed(x, w):
     return np.array([np.median(x[max(0, i - h):min(len(x), i + h + 1)]) for i in range(len(x))])
 
 
-def monitor_per_frame(tmon, vmon, end, exposure, interval, lag_frames, n):
-    """每帧曝光窗口 [te-exposure, te] 内监视器的中位数；te = endTime + lag*interval。"""
+def monitor_per_frame(tmon, vmon, end, exposure, interval, lag_frames, n, min_val=None):
+    """每帧曝光窗口 [te-exposure, te] 内监视器的中位数；te = endTime + lag*interval。
+
+    min_val: 低于该值的采样点视为"无束流"野值并丢弃（BL19U2 的 Ionchamber 文件开头有 5 个 ~1e-13 的
+    束流未开采样；若某个 lag 下多帧窗口都落进这段，平滑后的监视器会整体塌成 1e-13，因子爆到 1e5）。
+    """
     raw = np.full(n, np.nan)
+    dropped = 0
     for i in range(n):
         te = end[i] + lag_frames * interval
         m = (tmon >= te - exposure) & (tmon <= te)
-        raw[i] = np.median(vmon[m]) if m.any() else np.nan
+        vals = vmon[m]
+        if min_val is not None and vals.size:
+            keep = vals > min_val
+            dropped += int((~keep).sum())
+            vals = vals[keep]
+        raw[i] = np.median(vals) if vals.size else np.nan
     idx = np.arange(n)
     ok = np.isfinite(raw)
     if ok.sum() < n:
-        print(f"  警告: {n - ok.sum()} 帧的曝光窗口内没有监视器采样，已线性插值")
+        print(f"  警告: {n - ok.sum()} 帧的曝光窗口内没有可用监视器采样，已线性插值")
+    if dropped:
+        print(f"  注: 丢弃 {dropped} 个低于阈值的监视器采样（视为无束流野值）")
     return np.interp(idx, idx[ok], raw[ok])
 
 
@@ -98,7 +110,7 @@ def process_one(args):
 
 
 # ---------------------------------------------------------------- 主流程
-def scan_lag(tot, tmon, vmon, end, exposure, interval, smooth, metric="corr",
+def scan_lag(tot, tmon, vmon, end, exposure, interval, smooth, metric="corr", min_val=None,
              scan=60, step=2, subsample=4):
     """扫 lag。两个判据都打印：
       corr = 平滑后（检测器总计数 vs 监视器）的相关系数 —— 细粒度、稳健，默认用它；
@@ -111,7 +123,7 @@ def scan_lag(tot, tmon, vmon, end, exposure, interval, smooth, metric="corr",
     B = max(10, (n // subsample) // 40)
     rows = []
     for lag in range(-scan, scan + 1, step):
-        sm_full = runmed(monitor_per_frame(tmon, vmon, end, exposure, interval, lag, n), smooth)
+        sm_full = runmed(monitor_per_frame(tmon, vmon, end, exposure, interval, lag, n, min_val), smooth)
         sm = sm_full[sub]
         sm = sm / sm.mean()
         c = float(np.corrcoef(d_sub, sm)[0, 1])
@@ -148,6 +160,8 @@ def main():
     ap.add_argument("--lag-metric", choices=["corr", "step"], default="corr",
                     help="lag 自动选择的判据：corr=相关系数（细粒度、默认）/ step=最大相邻块台阶（粒度粗）")
     ap.add_argument("--smooth", type=int, default=15, help="监视器滑动中位数窗口（帧）")
+    ap.add_argument("--monitor-min-frac", type=float, default=0.05,
+                    help="丢弃低于（该比例×监视器全局中位）的采样点，视为无束流野值；0 表示不过滤")
     ap.add_argument("--workers", type=int, default=WORKERS, help="写盘并行进程数")
     ap.add_argument("--limit", type=int, default=None, help="只处理前 N 帧（试跑用）")
     ap.add_argument("--dry-run", action="store_true", help="只做诊断与 lag 扫描，不写文件")
@@ -174,6 +188,12 @@ def main():
     print(f"曝光 --exposure {args.exposure} s → 每帧空白 {np.median(d) - args.exposure:.4f} s")
     print(f"监视器 {len(tmon)} 点 / {(tmon[-1]-tmon[0]):.0f} s = {len(tmon)/(tmon[-1]-tmon[0]):.2f} 点/s"
           f" → 每帧窗口内约 {len(tmon)/(tmon[-1]-tmon[0])*args.exposure:.1f} 点")
+    mon_med = float(np.median(vmon))
+    min_val = args.monitor_min_frac * mon_med if args.monitor_min_frac > 0 else None
+    if min_val is not None:
+        nlow = int((vmon <= min_val).sum())
+        print(f"监视器全局中位 {mon_med:.3e}；低于 {args.monitor_min_frac:.0%} 中位（视为无束流野值）的采样点: {nlow} 个"
+              f"{' — 会被丢弃' if nlow else ''}")
 
     def collect_totals(idxs):
         import fabio
@@ -188,12 +208,12 @@ def main():
         interp = np.interp(np.arange(n), sub, tot_sub)
         tot_for_scan = np.where(full > 0, full, interp)
         lag = scan_lag(tot_for_scan, tmon, vmon, end, args.exposure, args.interval, args.smooth,
-                       metric=args.lag_metric)
+                       metric=args.lag_metric, min_val=min_val)
         if args.dry_run:
             print("\ndry-run：不写文件")
             return
 
-    raw = monitor_per_frame(tmon, vmon, end, args.exposure, args.interval, lag, n)
+    raw = monitor_per_frame(tmon, vmon, end, args.exposure, args.interval, lag, n, min_val)
     sm = runmed(raw, args.smooth)
     factor = np.median(sm) / sm
     print(f"\n采用 lag = {lag} 帧 (≈ {lag*args.interval:.0f} s) | 因子 {factor.min():.4f}~{factor.max():.4f} (中位 {np.median(factor):.4f})")
