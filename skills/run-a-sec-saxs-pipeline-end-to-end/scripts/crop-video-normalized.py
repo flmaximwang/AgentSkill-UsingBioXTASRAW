@@ -6,8 +6,11 @@
 （factor_i = median(TB)/TB_i，TB 取自 emit-bl19u2-header-txt.py 产出的 normalization_factors.csv），
 直接把像素流喂给 ffmpeg，只留 mp4 + 量化副产物。
 
-画面约定（与历史 session 的 crop_C 一致）：给的是"左下角为原点"的 x/y，脚本内部换算成数组行列
-row = H-1-y、col = x。裁剪 → 固定灰阶窗口（抽样帧的 p0.5/p99.9 定死，逐帧自动拉伸会让漂移消失）
+画面约定（**两个轴都是从"大的那头"数**——BL19U2 视图给的那套坐标）：数组下标
+  row = H-1-y       （y 从下往上数）
+  col = W-1-x       （x **从右往左**数，即镜像）
+实测标定（bsa_00061 对历史视频帧做相关：cols 724-794=W-1-680..W-1-750 → corr 0.66；若按 col=x 取 680-750 → corr 0.11）。
+裁剪 → 固定灰阶窗口（抽样帧的 p0.5/p99.9 定死，逐帧自动拉伸会让漂移消失）
 → 8× 最近邻放大 → 左上角烧帧号 → rgb24 rawvideo 管道给 ffmpeg。
 
 副产物：逐帧裁剪区 sum / 强度质心 CSV（= 束斑漂移监测）、uint16 堆栈 .npy（可选 --save-stack）、
@@ -53,10 +56,12 @@ def main():
     ap.add_argument("--series-dir", required=True, help="原始 tif 目录")
     ap.add_argument("--norm-csv", required=True, help="normalization_factors.csv（提供每帧 Transmitted_Beam）")
     ap.add_argument("--out", required=True, help="输出 mp4 路径")
-    ap.add_argument("--x1", type=int, default=680, help="裁剪区 x 下界（列，左→右）")
-    ap.add_argument("--x2", type=int, default=750, help="裁剪区 x 上界（列，左→右）")
-    ap.add_argument("--y1", type=int, default=910, help="裁剪区 y 下界（行，**左下角为原点**）")
-    ap.add_argument("--y2", type=int, default=970, help="裁剪区 y 上界（行，**左下角为原点**）")
+    ap.add_argument("--x1", type=int, default=680, help="裁剪区 x 下界（横向）")
+    ap.add_argument("--x2", type=int, default=750, help="裁剪区 x 上界（横向）")
+    ap.add_argument("--y1", type=int, default=910, help="裁剪区 y 下界（纵向，**从下往上数**）")
+    ap.add_argument("--y2", type=int, default=970, help="裁剪区 y 上界（纵向，**从下往上数**）")
+    ap.add_argument("--x-origin", choices=["right", "left"], default="right",
+                    help="x 从哪头数：right=col=W-1-x（BL19U2 视图的约定，默认）；left=col=x")
     ap.add_argument("--upscale", type=int, default=8, help="整数最近邻放大倍数（libx264+yuv420p 要求偶数边长）")
     ap.add_argument("--fps", type=int, default=20, help="播放帧率（2000 帧 @20fps ≈ 100 s）")
     ap.add_argument("--stride", type=int, default=1, help="抽帧步长；>1 时视频更快、更小")
@@ -94,13 +99,18 @@ def main():
     H, W = d0.shape
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
     r1, r2 = H - 1 - args.y2, H - 1 - args.y1
-    cw, ch = args.x2 - args.x1 + 1, r2 - r1 + 1
-    print(f"图 {H}行×{W}列 | x {args.x1}-{args.x2} y {args.y1}-{args.y2}(左下原点) → 行 {r1}-{r2} | 裁块 {ch}行×{cw}列")
+    if args.x_origin == "right":
+        c1, c2 = W - 1 - args.x2, W - 1 - args.x1      # x 从右数 → 镜像
+    else:
+        c1, c2 = args.x1, args.x2
+    cw, ch = c2 - c1 + 1, r2 - r1 + 1
+    print(f"图 {H}行×{W}列 | x {args.x1}-{args.x2}(从{'右' if args.x_origin=='right' else '左'}数) "
+          f"y {args.y1}-{args.y2}(从下数) → 行 {r1}-{r2} 列 {c1}-{c2} | 裁块 {ch}行×{cw}列")
 
     # 第 1 遍：抽样定显示灰阶（在归一化后的像素上定，逐帧自动拉伸会让漂移消失）
     sample = []
     for i in range(0, len(files), max(1, len(files) // 80)):
-        sample.append(fabio.open(files[i]).data[r1:r2 + 1, args.x1:args.x2 + 1].astype(np.float32) * factors[i])
+        sample.append(fabio.open(files[i]).data[r1:r2 + 1, c1:c2 + 1].astype(np.float32) * factors[i])
     s = np.concatenate([x.ravel() for x in sample])
     lo, hi = np.percentile(s, 0.5), np.percentile(s, 99.9)
     print(f"抽样 {len(sample)} 帧: lo(p0.5)={lo:.1f} hi(p99.9)={hi:.1f}")
@@ -115,7 +125,7 @@ def main():
     rows = []
     yy, xx = np.mgrid[0:ch, 0:cw]
     for i, p in enumerate(files):
-        c = fabio.open(p).data[r1:r2 + 1, args.x1:args.x2 + 1].astype(np.float32) * factors[i]
+        c = fabio.open(p).data[r1:r2 + 1, c1:c2 + 1].astype(np.float32) * factors[i]
         if stack is not None:
             stack[i] = np.clip(c, 0, 65535).astype(np.uint16)
         tot = float(c.sum())
@@ -149,8 +159,8 @@ def main():
     preview = args.preview_out or (os.path.splitext(args.out)[0] + ".preview.png")
     full = Image.fromarray(np.clip(d0 / max(float(d0.max()), 1) * 255, 0, 255).astype(np.uint8), "L").convert("RGB")
     dr = ImageDraw.Draw(full)
-    dr.rectangle([args.x1, r1, args.x2, r2], outline=(255, 0, 0), width=3)
-    crop_v = np.clip((d0[r1:r2 + 1, args.x1:args.x2 + 1].astype(np.float32) - lo) / max(hi - lo, 1e-9) * 255,
+    dr.rectangle([c1, r1, c2, r2], outline=(255, 0, 0), width=3)
+    crop_v = np.clip((d0[r1:r2 + 1, c1:c2 + 1].astype(np.float32) - lo) / max(hi - lo, 1e-9) * 255,
                      0, 255).astype(np.uint8)
     crop_im = Image.fromarray(crop_v, "L").resize((cw * 6, ch * 6), Image.NEAREST).convert("RGB")
     canvas = Image.new("RGB", (full.width + crop_im.width + 20, max(full.height, crop_im.height)), (30, 30, 30))

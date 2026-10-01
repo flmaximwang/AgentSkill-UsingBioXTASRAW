@@ -97,9 +97,14 @@ python emit-bl19u2-header-txt.py \
 
 ```bash
 python crop-video-normalized.py --series-dir <tif 目录> --norm-csv <out>/norm/normalization_factors.csv \
-  --out <out>/video/<系列>_crop_x<x1>-<x2>_y<y1>-<y2>_8x_20fps.mp4 \
-  --x1 .. --x2 .. --y1 .. --y2 ..       # y 是**左下角为原点**
+  --out <out>/video/<系列>_crop_x<x1>-<x2>_y<y1>-<y2>_cols<c1>-<c2>_rows<r1>-<r2>_8x_20fps.mp4 \
+  --x1 .. --x2 .. --y1 .. --y2 ..       # x/y 都从"大的那头"数（见下）
 ```
+
+**坐标约定（别猜，用旧帧标定）**：BL19U2 视图给的 x/y **两个轴都从大的那头数** → 数组下标
+`row = H-1-y`、`col = W-1-x`（`--x-origin right` 为默认；从左数才用 `--x-origin left`）。
+标定法：拿一张**已被接受过的旧视频帧**，把候选读法各裁一份、按同一条渲染链渲出来算相关系数——
+本机实测 `col=x` **0.11** vs `col=W-1-x` **0.66**，行向扫描峰值落在 `rows 708-768 = H-1-y`。
 
 - 因子 `median(TB)/TB_i` 在**读入内存时**乘上，直接喂 ffmpeg —— 全程不落归一化 tif；
 - 灰阶窗口用抽样帧定死后**逐帧不再自动拉伸**（自动拉伸会把要看的漂移抹平）；
