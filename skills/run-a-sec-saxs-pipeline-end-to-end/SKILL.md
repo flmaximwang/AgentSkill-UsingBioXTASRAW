@@ -182,6 +182,24 @@ DENSS 是 RAW 原生（numba），`Fast` 模式实测几秒到几十秒就出；
   换成峰前+峰后两段后落到 **23.7–27.4 Å、r² 0.91–0.99**（BSA 单体理论 ≈29 Å）。
 - **低 q 被寄生散射污染会把 IFT 的 Dmax 拖到离谱值**：同一曲线未裁 q 时 BIFT 给 **Dmax=417 Å / Rg=149 Å**。
   用 `--trim-qmin 0.017` 显式裁掉低 q 段（内部就是 RAW 自己的 `setQrange`，不是自写拟合），再跑 IFT/MW。
+- **ATSAS 接线三件事**（装好 ATSAS 后要一次对上）：① `--atsas-dir` 必须指到 **`bin` 这一级**
+  （RAW 用 `os.path.split(atsas_dir)[0]` 反推 `ATSAS` 变量；本机实测 `/Applications/ATSAS-4.1.4-1/bin`）；
+  ② `dammif` 写出的模型名是 **`<prefix>-1.<model_format>`**（默认 `cif`），而 `damaver` **只接受文件名、
+  不接受路径**、且 `model_format` 必须与 dammif 一致 —— 对不上就报
+  `FileNotFoundError: <prefix>-damaver-distances.txt`（看着像 DAMAVER 坏了，其实是输入清单错了）；
+  ③ `mw_bayes` / `mw_datclass` **没有 `settings` 参数**（签名是 `profile, rg, i0, first, atsas_dir, ...`），
+  传 `atsas_dir` 才生效，否则一直报 TypeError 被误当"没装 ATSAS"。
+- **`--dammif-mode Fast` 实测约 8–20 s/模型**（本机 4 模型 ~40 s）；`Slow` 会显著更久，先 Fast 看 χ²，
+  只有要做正式交付才换 Slow 重跑。
+- **χ² 大 = 这组数据还不配做从头建模**，别在重建参数里找答案：本机对照两套数据——bsa DAMMIF 四模型
+  `χ²=2.08 / Rg 28.0 Å / Dmax≈88 Å / MW 63 kDa`、DAMAVER `NSD=0.06`（单一聚类，模型一致，可用）；
+  4LI2-676 同样流程 `χ²=27.7`、DAMAVER 分出 3 个聚类、GNOM Dmax 146 Å（Guinier 只给 15.9 Å）、DENSS 直接失败
+  → 结论是**曲线本身还不够干净**（弱峰 + 无监视器归一 + 低 q 污染），先回去修曲线，不要交付模型。
+- **DENSS 报 `DENSS failed to run properly` / `IndexError: index -1 is out of bounds ... labeled_support == feature` = 它的输入 IFT 不可用**，不是 DENSS 参数没调好：那个下标来自 `DENSS.py:1931` —— 收缩包络把 support 压成**空**（`num_features == 0`）时 `sums` 长度为 0。
+  根因几乎总是 IFT 被低 q 拖出**离谱的 Dmax**（本机 4LI2-676 实测：Guinier Rg=15.9 Å，BIFT 却给 Dmax=189–357 Å，
+  DENSS 盒子 side>1000 Å、密度摊薄 → 塌陷）。处置顺序：① 先把 q 裁到 qRg_min ≈ 0.4–0.5（`--trim-qmin`）；
+  ② 仍不对就用**显式 Dmax** 走 RAW 原生 DIFT 喂 DENSS（`--ift-dmax 55`，经验起手 Dmax ≈ 3×Guinier Rg）；
+  ③ 只在 ① ② 之后才考虑 DENSS 自己的步骤/盒子参数。**不要在 IFT 坏的时候去调 DENSS 参数。**
 - **`models/` 空着 = 没跑 `shape` 步，或缺 ATSAS 又被当成"珠模出不来就什么都不出"**：正确姿势是
   `--model-engine auto` —— 电子云（DENSS）总出，珠模（DAMMIF）有 ATSAS 才出；两者都缺才叫失败。
 - **表里 `rg = -1` 不是负数，是 RAW 的失败哨兵值**（该区间的 Guinier 拟合没收敛/点数不够）——按"此区间不可用"读，

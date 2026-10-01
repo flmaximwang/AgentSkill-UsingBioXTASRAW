@@ -85,6 +85,7 @@ done
 - **RAW 的 BL19U2 header 归一化是"内建"的**：`SASFileIO.py:909` 按 `<图像名>.txt` 读 header，
   `NormalizationList=[['/','Transmitted_Beam']]` 逐帧求值（`SASImage.py:366-380`）。线站 `.cfg` 里这套**已经写好了**，
   只差 `ImageHdrFormat` 与 `EnableNormalization` 两个开关 → **不需要写归一化 tif**（省 18 GB）。
+- **ATSAS 接上后的实测（2026-10-01，`/Applications/ATSAS-4.1.4-1/bin`）**：GNOM 出 `.out`、DAMMIF×4（Fast，~8-20 s/模型）、DAMAVER 出聚类与 NSD；bsa 给 `χ²=2.08 / Rg 28.0 Å / Dmax≈88 Å / MW 63 kDa`、`NSD=0.06`（对上 BSA 单体 66.5 kDa）；同流程的 4LI2-676 给 `χ²=27.7`、3 个聚类、DENSS 失败 → 判为"曲线还不够干净"，不交付模型。接线坑：`--atsas-dir` 要指到 `bin`；`dammif` 输出名是 `<prefix>-1.<format>` 而 `damaver` 只吃文件名；`mw_bayes`/`mw_datclass` 没有 `settings` 参数。
 - **形状重建是两件事，不是一件**：电子云（DENSS，`.mrc`，RAW 原生）与珠模（DAMMIF，`.pdb`，ATSAS 可执行文件的外壳）是同一份 IFT 的两种重建——`models/` 空着是错的；没 ATSAS 时先出电子云并在日志明说，装了再补珠模。
 - **`find_buffer_range` 会在"弱峰 + 强漂移"的 SEC 系列上失败**（返回 `success=False`、区间 `None`）：
   本次 BSA 数据的低 q 强度在 50 min 里单调抬升 ~40%（束位/几何漂移，与 `beam-instability` 参考档一致），

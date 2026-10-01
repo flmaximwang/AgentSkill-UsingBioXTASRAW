@@ -100,6 +100,19 @@ def step_integrate(files, st, out, prefix, limit):
     return profiles
 
 
+def clip_ranges(rngs, n_frames, what):
+    """把手工给的区间收进 [0, n_frames-1]：RAW 的区间是 0 基闭区间，end 写大了会 IndexError
+    （实测：445 帧的系列给 '400,445' → SECM.averageFrames 里 list index out of range）。"""
+    for r in rngs:
+        if r[1] > n_frames - 1:
+            log(f"  ！{what} 区 {r} 超出帧范围（共 {n_frames} 帧，最大下标 {n_frames-1}）→ 收到 {n_frames-1}")
+            r[1] = n_frames - 1
+        if r[0] < 0:
+            log(f"  ！{what} 区 {r} 起点 < 0 → 收到 0")
+            r[0] = 0
+    return rngs
+
+
 def step_ranges_and_subtraction(profiles, st, out, prefix, args):
     """buffer 区 → 扣减 →（可选）基线 → sample 区。返回样品平均曲线与 series。"""
     series = raw.profiles_to_series(profiles, st)
@@ -107,6 +120,7 @@ def step_ranges_and_subtraction(profiles, st, out, prefix, args):
     # ---- buffer 区
     if args.buffer_range:
         b_rng = [[int(x) for x in part.split(",")] for part in args.buffer_range.split(";")]
+        clip_ranges(b_rng, len(profiles), "buffer")
         b_ok = True
     else:
         ok, s, e = raw.find_buffer_range(series)
@@ -157,6 +171,7 @@ def step_ranges_and_subtraction(profiles, st, out, prefix, args):
     if args.sample_range:
         s0, s1 = (int(x) for x in args.sample_range.split(","))
         s_ok, s_rng = True, [[s0, s1]]
+        clip_ranges(s_rng, len(profiles), "sample")
         s_valid = None
     else:
         ok, s, e = raw.find_sample_range(series, profile_type=pt)
@@ -304,8 +319,15 @@ def step_guinier(sample_profile, st, out, args):
     return rows, report_profiles
 
 
-def step_ift(sample_profile, st, out, prefix, atsas_dir):
-    """IFT：BIFT（RAW 原生）+ GNOM（需 ATSAS）。两者都是 RAW 的入口。"""
+def write_ift_summary(out, rows):
+    with open(os.path.join(out, "tables", "ift_summary.csv"), "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["method", "dmax", "rg", "chi_sq", "log_alpha", "evidence"])
+        w.writerows(rows)
+
+
+def step_ift(sample_profile, st, out, prefix, atsas_dir, ift_dmax=None):
+    """IFT：BIFT（RAW 原生）+ （可选）显式 Dmax 的 DIFT（给 DENSS 用）+ GNOM（需 ATSAS）。"""
     ifts, rows = [], []
     try:
         b = raw.bift(sample_profile, settings=st, single_proc=True)
@@ -317,6 +339,22 @@ def step_ift(sample_profile, st, out, prefix, atsas_dir):
     except Exception as exc:
         log(f"  ！BIFT 失败：{type(exc).__name__}: {exc}")
         ift = None
+
+    # 显式 Dmax 的 DIFT：DENSS 的推荐输入。DENSS 按 dmax 建盒子；Dmax 被低 q 拖大 → 盒子里密度太稀，
+    # 收缩包络塌成空 support → DENSS 报 `IndexError: index -1 is out of bounds ... labeled_support == feature`
+    # （DENSS.py:1931 在 num_features==0 时 sums 长度为 0）。修法是回去修 IFT 输入，不是调 DENSS 参数。
+    denss_ift_obj = None
+    if ift_dmax:
+        try:
+            d = raw.denss_ift(sample_profile, dmax=float(ift_dmax))
+            denss_ift_obj = d[0]
+            raw.save_ift(denss_ift_obj, f"{prefix}_denss_ift.ift", os.path.join(out, "ifts"))
+            ifts.append(denss_ift_obj)
+            rows.append(("DIFT", float(d[1]), float(d[2]), float(d[6]), float('nan'), float('nan')))
+            log(f"DIFT : Dmax={d[1]:.1f} A（显式）Rg={d[2]:.2f} A chi²={d[6]:.2f} alpha={d[7]:.2f} → 给 DENSS 用")
+        except Exception as exc:
+            log(f"  ！DIFT 失败：{type(exc).__name__}: {exc}")
+
     dmax = None
     if atsas_dir:
         try:
@@ -326,16 +364,16 @@ def step_ift(sample_profile, st, out, prefix, atsas_dir):
             raw.save_ift(gnom_ift, f"{prefix}_gnom.out", os.path.join(out, "ifts"))
             rows.append(("GNOM", float(dmax), float(g[1] if len(g) > 1 else np.nan), float('nan'), float('nan'), float('nan')))
             log(f"GNOM : Dmax={dmax:.1f} A  → {prefix}_gnom.out")
-            return (gnom_ift, ifts + [gnom_ift], rows, dmax)
+            ifts = ifts + [gnom_ift]
+            ift = gnom_ift
+            write_ift_summary(out, rows)      # 别在 early return 前漏掉这张表
+            return (ift, ifts, rows, dmax, denss_ift_obj)
         except NoATSASError as exc:
             log(f"  ！GNOM 需要 ATSAS（未装/未指定 --atsas-dir）：{exc}")
         except Exception as exc:
             log(f"  ！GNOM 失败：{type(exc).__name__}: {exc}")
-    with open(os.path.join(out, "tables", "ift_summary.csv"), "w", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow(["method", "dmax", "rg", "chi_sq", "log_alpha", "evidence"])
-        w.writerows(rows)
-    return (ift, ifts, rows, dmax)
+    write_ift_summary(out, rows)
+    return (ift, ifts, rows, dmax, denss_ift_obj)
 
 
 def step_mw(sample_profile, st, out, ift, atsas_dir):
@@ -348,12 +386,14 @@ def step_mw(sample_profile, st, out, ift, atsas_dir):
             log(f"MW {name}: {res[0]:.1f} kDa (details {res[1:]})")
         except Exception as exc:
             log(f"  ！MW {name} 失败：{type(exc).__name__}: {exc}")
-    try:
-        res = raw.mw_bayes(sample_profile, settings=st)
-        rows.append(("Bayesian", *[float(x) if isinstance(x, (int, float, np.floating)) else str(x) for x in res[:3]]))
-        log(f"MW Bayesian: {res[0]:.1f} kDa")
-    except Exception as exc:
-        log(f"  ！MW Bayesian 跳过（通常需 ATSAS）：{type(exc).__name__}")
+    # 注意：mw_bayes / mw_datclass 没有 settings 参数（签名：profile, rg, i0, first, atsas_dir, ...）
+    for name, fn in (("Bayesian", raw.mw_bayes), ("Datclass", raw.mw_datclass)):
+        try:
+            res = fn(sample_profile, atsas_dir=atsas_dir)
+            rows.append((name, *[float(x) if isinstance(x, (int, float, np.floating)) else str(x) for x in res[:3]]))
+            log(f"MW {name}: {res[0]:.1f} kDa")
+        except Exception as exc:
+            log(f"  ！MW {name} 跳过（需 ATSAS）：{type(exc).__name__}: {exc}")
     with open(os.path.join(out, "tables", "mw.csv"), "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(["method", "mw", "detail1", "detail2", "detail3"])
@@ -361,7 +401,7 @@ def step_mw(sample_profile, st, out, ift, atsas_dir):
     return rows
 
 
-def step_shape(ift, ifts, out, prefix, args, atsas_dir):
+def step_shape(ift, ifts, out, prefix, args, atsas_dir, model_ift=None):
     """形状重建：**电子云（RAW 原生 DENSS）总跑**；**珠模（DAMMIF）仅在有 ATSAS 时跑**。
 
     两者是同一份 IFT 的两种重建：DENSS 给电子密度图（.mrc），DAMMIF 给 dummy-atom 珠模（.pdb），
@@ -379,8 +419,11 @@ def step_shape(ift, ifts, out, prefix, args, atsas_dir):
         do_denss = engine in ('denss', 'both')
         do_dammif = engine in ('dammif', 'both')
     if do_denss:
+        denss_in = model_ift if model_ift is not None else ift
+        if denss_in is None:
+            log("  ！DENSS 需要一个 IFT，当前没有 → 跳过")
         try:
-            res = raw.denss(ift, f"{prefix}_denss", mdir, mode=args.denss_mode)
+            res = raw.denss(denss_in, f"{prefix}_denss", mdir, mode=args.denss_mode)
             log(f"  DENSS（电子云）: chi²={res[1]:.2f} Rg={res[2]:.1f} A "
                 f"support_vol={res[3]:.0f} side={res[4]:.1f} A  mode={args.denss_mode}")
         except Exception as exc:
@@ -389,31 +432,28 @@ def step_shape(ift, ifts, out, prefix, args, atsas_dir):
         if not atsas_dir:
             log("  ！珠模 DAMMIF 需要 ATSAS（未指定 --atsas-dir）→ 本次只出电子云（DENSS）")
             return
-        if itf is None:
+        if ift is None:
             log("  ！DAMMIF 需要 GNOM 的 IFTM，当前没有 → 跳过珠模")
             return
         files = []
         for i in range(args.n_models):
             try:
-                res = raw.dammif(ift, f"{prefix}_dammif_{i+1:02d}", mdir, mode='Slow',
-                                 symmetry=args.symmetry, atsas_dir=atsas_dir)
+                res = raw.dammif(ift, f"{prefix}_dammif_{i+1:02d}", mdir, mode=args.dammif_mode,
+                                 symmetry=args.symmetry, atsas_dir=atsas_dir,
+                                 model_format=args.model_format)
                 log(f"  DAMMIF #{i+1}: chi²={res[0]:.2f} Rg={res[1]:.1f} Dmax={res[2]:.1f} MW={res[3]:.0f}")
-                files.append(os.path.join(mdir, f"{prefix}_dammif_{i+1:02d}.pdb"))
+                # dammif 写出的模型名是 <prefix>-1.<model_format>；damaver 只要文件名、不要路径
+                files.append(f"{prefix}_dammif_{i+1:02d}-1.{args.model_format}")
             except Exception as exc:
                 log(f"  ！DAMMIF #{i+1} 失败：{type(exc).__name__}: {exc}")
                 break
         if len(files) >= 2:
             try:
-                a = raw.damaver(files, f"{prefix}_damaver", mdir)
+                a = raw.damaver(files, f"{prefix}_damaver", mdir,
+                                model_format=args.model_format, atsas_dir=atsas_dir)
                 log(f"  DAMAVER: NSD={a[1] if len(a) > 1 else '?'}")
             except Exception as exc:
                 log(f"  ！DAMAVER 失败：{type(exc).__name__}: {exc}")
-    else:
-        try:
-            res = raw.denss(ift, f"{prefix}_denss", mdir, mode='Slow')
-            log(f"  DENSS: chi²={res[1]:.2f} Rg={res[2]:.1f} support_vol={res[3]:.0f} side={res[4]:.1f}")
-        except Exception as exc:
-            log(f"  ！DENSS 失败：{type(exc).__name__}: {exc}")
 
 
 def step_report(profiles, sample_profile, report_profiles, ifts, series, out, prefix):
@@ -442,6 +482,9 @@ def main():
                     help="扣减后是否再做基线校正（RAW 的 Linear/Integral）")
     ap.add_argument("--baseline-ranges", default="0,20;1800,1990",
                     help="--baseline linear 时的起止区间 's0,s1;e0,e1'")
+    ap.add_argument("--ift-dmax", type=float, default=None,
+                    help="显式 Dmax（A）→ 用 RAW 原生 DIFT 生成 DENSS 的输入 IFT。IFT/DENSS 被低 q 拖坏时用"
+                         "（经验起手：Dmax ≈ 3×Guinier Rg）；不给则用 BIFT 自动定出的 IFT")
     ap.add_argument("--trim-qmin", type=float, default=None,
                     help="下游分析（Guinier 表/IFT/MW）前丢掉 q 低于此值的点（1/A）；低 q 被寄生散射污染时用")
     ap.add_argument("--guinier-ranges", default=None,
@@ -451,6 +494,10 @@ def main():
     ap.add_argument("--denss-mode", choices=["Fast", "Slow", "Custom"], default="Fast",
                     help="DENSS 模式（Fast 出得快、Slow 收敛更好、耗时更长）")
     ap.add_argument("--n-models", type=int, default=4, help="DAMMIF 模型数")
+    ap.add_argument("--dammif-mode", choices=["Fast", "Slow", "Custom"], default="Fast",
+                    help="DAMMIF 模式（Fast 出得快；Slow 更彻底、耗时显著更长）")
+    ap.add_argument("--model-format", choices=["cif", "pdb"], default="cif",
+                    help="DAMMIF/DAMAVER 输出的模型格式（pdb 便于直接看结构，cif 是 RAW 默认）")
     ap.add_argument("--symmetry", default="P1", help="DAMMIF 对称性")
     ap.add_argument("--atsas-dir", default=None, help="ATSAS bin 目录（装了就传，RAW 的 GNOM/DAMMIF 需要）")
     ap.add_argument("--no-header-normalization", action="store_true",
@@ -490,13 +537,14 @@ def main():
         series, sample_profile, ranges = step_ranges_and_subtraction(profiles, st, out, prefix, args)
     if "guinier" in steps and sample_profile is not None:
         rows_g, report_profiles = step_guinier(sample_profile, st, out, args)
-    ift, ifts, rows_i, dmax = (None, [], [], None)
+    ift, ifts, rows_i, dmax, denss_ift_obj = (None, [], [], None, None)
     if "ift" in steps and sample_profile is not None:
-        ift, ifts, rows_i, dmax = step_ift(sample_profile, st, out, prefix, args.atsas_dir)
+        ift, ifts, rows_i, dmax, denss_ift_obj = step_ift(sample_profile, st, out, prefix,
+                                                          args.atsas_dir, args.ift_dmax)
     if "mw" in steps and sample_profile is not None:
         step_mw(sample_profile, st, out, ift, args.atsas_dir)
     if "shape" in steps and sample_profile is not None:
-        step_shape(ift, ifts, out, prefix, args, args.atsas_dir)
+        step_shape(ift, ifts, out, prefix, args, args.atsas_dir, model_ift=denss_ift_obj)
     if "report" in steps and series is not None:
         step_report(profiles, sample_profile, report_profiles, ifts, series, out, prefix)
         try:
