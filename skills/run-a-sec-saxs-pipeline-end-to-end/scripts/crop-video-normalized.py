@@ -97,7 +97,8 @@ def main():
     else:
         factors = np.ones(len(files))   # 没有监视器数据（或显式关掉）→ 不归一化
         print("（未提供 --norm-csv 或 --normalize off：不做逐帧归一化，因子全 1）")
-    print(f"帧数 {len(files)} | 归一化 {args.normalize} | 因子 1–99%: "
+    nrm_state = "on" if (args.norm_csv and args.normalize == "on") else "off"
+    print(f"帧数 {len(files)} | 归一化 {nrm_state} | 因子 1–99%: "
           f"{np.percentile(factors, 1):.4f}–{np.percentile(factors, 99):.4f}（中位 1.0）")
 
     d0 = fabio.open(files[0]).data
