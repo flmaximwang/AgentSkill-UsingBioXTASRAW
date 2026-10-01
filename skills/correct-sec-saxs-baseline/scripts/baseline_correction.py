@@ -47,7 +47,7 @@ def main():
     try:
         import bioxtasraw.RAWAPI as raw
     except ImportError:
-        sys.exit("找不到 bioxtasraw：请在 RAW 源码目录执行 `pip install .`（PyPI 上没有该包）")
+        sys.exit("找不到 bioxtasraw：请按 references/sec-saxs-baseline-api.md 从源码安装 RAW API（PyPI 上没有该包）")
 
     # --- 1. 载入 series：.hdf5 直读；否则把同一系列的 .dat 一起载入再拼成 series -------------
     if args.series.lower().endswith(".hdf5"):

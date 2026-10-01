@@ -9,12 +9,13 @@
 ## 一、安装
 
 ```bash
-git clone https://github.com/jbhopkins/bioxtasraw.git && cd bioxtasraw
-pip install .        # 不用 GUI 时无需 wx
+git clone --branch v2.4.2 --depth 1 https://github.com/jbhopkins/bioxtasraw.git && cd bioxtasraw
+pip install .
 ```
 
+> 版本钉住：`v2.4.2`（实测 `git ls-remote --tags` 到的最新 tag；官方文档对应 v2.4.1/latest）。
 > 实测：`bioxtasraw` **不在 PyPI** 上（`uv pip install bioxtasraw` → "not found in the package registry"），
-> 必须走源码 `pip install .`。装完也会生成 `bioxtas_raw` 命令可直接起 GUI。
+> 必须走源码安装。装完也会生成 `bioxtas_raw` 命令可直接起 GUI。
 
 ## 二、函数清单（已核对签名）
 
