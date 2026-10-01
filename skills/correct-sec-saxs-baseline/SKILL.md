@@ -144,8 +144,9 @@ related_skills:
 
 **束流不稳定的三层**（本 skill 只覆盖第 ② 层）：强度起伏（乘性，→ 逐帧通量归一化）/ 平滑漂移（→ Linear·Integral）/
 **分块台阶（每 N 帧整体偏移 → RAW 两套都不适用）**。判型方法与脚本见
-`references/beam-instability-and-step-offsets.md` 与 `scripts/block_step_correction.py`
-（含无 RAW 环境下的桩测试实跑数字）。
+`references/beam-instability-and-step-offsets.md`
+——① 层落地用 `scripts/frame_flux_normalization.py`（按入射监视器逐帧标定 tif；曝光与采样间隔是两个独立参数），
+③ 层用 `scripts/block_step_correction.py`（含无 RAW 环境下的桩测试实跑数字）。
 
 ## 相关 skills
 
