@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Aggregate many pipeline runs into one table (PROC/tube/_summary/{summary.csv,summary.md}).
+"""Aggregate many pipeline runs into one table
+(<processed>/<mode>/_summary/{summary.csv,summary.md}).
 
 Reads, for every sub-directory of <root> that contains summary.json:
   summary.json, tables/guinier_results.json, tables/ift_summary.csv, tables/mw.csv

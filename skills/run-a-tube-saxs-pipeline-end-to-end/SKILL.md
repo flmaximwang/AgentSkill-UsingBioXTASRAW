@@ -65,6 +65,10 @@ MW 方法选择 → `choose-a-molecular-weight-method`；重建结果评估 → 
 `877-apo-pb7` 里的 "pb7" 是缓冲液后缀，不是背景）；前缀不一致时用 `--sample-key` / `--control-key` 手工指定。
 目录还没归类（一堆 series 平铺在一个目录里）时，先走 `organize-batch-saxs-dataset` 拆成"每样品一个文件夹 + 夹着它的背景"。
 
+**产物落点约定（本项目）**：原始帧在 `<项目>/data/<模式>/<样品>/`，结果放**同级的** `<项目>/processed/<模式>/<样品>/`
+（本机实测结构：`DataProcess_2026.10.01/{data,processed}/{Tube-SAXS,SEC-SAXS}/<样品>/`）。
+`--out-dir` 指到 `processed/<模式>/<样品>`，整批跑时再在其上一层做 `_summary/` 与 `_logs/`。
+
 ## 核心机制（四条，都是实测撞出来的）
 
 **① 归一化：RAW 自己会读逐帧 txt，但 cfg 里两个开关默认是关的。**
@@ -138,12 +142,15 @@ python run-raw-tube-pipeline.py --sample-dir <目录> --cfg <日期>.cfg --out-d
 ### Step 2 — 一批样品一起跑 + 汇总（整条稀释序列/整批数据）
 
 ```bash
-for d in <Tube-SAXS>/*/; do                       # 3 个并行足够（BIFT 单进程、DENSS Fast 几秒）
-  python run-raw-tube-pipeline.py --sample-dir "$d" --cfg <日期>.cfg \
-    --out-dir <产物根>/$(basename "$d") --model-engine denss --denss-mode Fast
+RAW=<项目>/data/Tube-SAXS            # 原始帧
+PRO=<项目>/processed/Tube-SAXS       # 产物根（与 data/ 同级）
+for d in "$RAW"/*/; do               # 3 个并行足够（BIFT 单进程、DENSS Fast 几秒）
+  python run-raw-tube-pipeline.py --sample-dir "$d" --cfg <项目>/data/<日期>.cfg \
+    --out-dir "$PRO/$(basename "$d")" --model-engine denss --denss-mode Fast \
+    > "$PRO/_logs/$(basename "$d").log" 2>&1
 done
-python summarize-tube-run.py <产物根>      # → <产物根>/_summary/summary.csv + summary.md
-python plot-tube-overview.py <产物根>      # → <产物根>/_summary/overview.png
+python summarize-tube-run.py "$PRO"        # → $PRO/_summary/summary.csv + summary.md
+python plot-tube-overview.py "$PRO"        # → $PRO/_summary/overview.png
 ```
 
 `summarize-tube-run.py` 只读各目录已产出的 `summary.json` / `tables/*.json` / `tables/*.csv`，
