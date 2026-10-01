@@ -1,6 +1,6 @@
 ---
 name: correct-sec-saxs-baseline
-description: "扣减后强度-帧号仍漂移时按性质选基线校正：束流/仪器漂移→Linear，毛细管污垢→Integral；含过校正识别与 EFA 互斥。用于「SEC 扣减完基线还在抬/在漂」「峰后基线回不到零」「该用哪种基线校正」「校正完高 q 更怪了」；不负责区间选择（转 process-sec-saxs-series）。"
+description: "扣减后强度-帧号仍漂移时按性质选基线校正：束流/仪器漂移→Linear，毛细管污垢→Integral；含过校正识别与 EFA 互斥。用于「SEC 扣减完基线还在抬/在漂」「峰后基线回不到零」「该用哪种基线校正」「校正完高 q 更怪了」「有没有现成脚本做基线校正」；不负责区间选择（转 process-sec-saxs-series）。"
 source_book: BioXTAS RAW 官方文档 *Advanced Series processing – Baseline correction*（v2.4.1）；《利用BioXTAS RAW程序处理SEC-SAXS数据》· 刘广峰
 source_chapter: 源C 全篇 / 源B 第 23–33 步
 tags: [saxs, bioxtas-raw, sec-saxs, baseline-correction, drift]
@@ -136,7 +136,11 @@ related_skills:
 - 引用要求：使用积分基线校正时，除 RAW 论文外还需引用 Brookes, Vachette, Rocco & Pérez, *J. Appl. Cryst.* (2016) 49, 1827-1841（DOI 10.1107/S1600576716011201）——这是源C 明确要求的。
 
 **参考文件**：三档图（Unsubtracted / Subtracted / Baseline Corrected）、LC Analysis 面板的基线区控制、术语见
-`references/../process-sec-saxs-series/references/sec-saxs-series-workspace.md`。
+`../process-sec-saxs-series/references/sec-saxs-series-workspace.md`。
+
+**脚本入口**：GUI 的 LC Analysis 面板与 Python API 是同一套实现。要离开界面用脚本跑（可复现、可批处理）时，用
+`references/sec-saxs-baseline-api.md`（已核对 `RAWAPI.py` 源码签名的函数清单 + 四条只有读源码才看得出的约束）与
+可执行脚本 `scripts/baseline_correction.py`（argparse，`--help` 里有全部默认值与单位）。
 
 ## 相关 skills
 
