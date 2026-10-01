@@ -8,10 +8,11 @@
 | 《利用BioXTAS RAW程序处理SEC-SAXS数据》（同上，2024-04-28）+ 官方教程 *Basic SEC-SAXS processing* 与 *Baseline correction* | SEC 系列处理 / 基线校正（**第二源 = 官方文档**，因为译文砍掉了整节） | [`books/sec-saxs-series/`](books/sec-saxs-series/) |
 | **BioXTAS RAW v2.4.2 官方文档全站**（97 文件 / 16,010 行；tutorial 37 节 + manual 19 节 + saxs 5 节 + api 11 节 + install 16 节） | 整条判据流水线：配置 / 还原 / Guinier / IFT 与 P(r) / MW / 绝对刻度 / 重建评估 / 模型拟合 / 去卷积 / 时间分辨 / RAWAPI | [`books/bioxtas-raw-official-docs/`](books/bioxtas-raw-official-docs/) |
 
-**14 个 skill**：13 个「决策点」skill（下面索引表）+ 1 个**端到端流水线** skill（管式/静态帧，工程产物、非蒸馏）：配置是否就绪 → 一批帧怎么变成曲线 → 读出的 Rg 信不信得过 → SEC 洗脱里哪一段算一个样品 → 扣减后还在漂怎么办 → 强度怎么钉到绝对刻度 → 从 I(q) 到 P(r) 与 Dmax → 分子量该用哪一法 → 重建做完能不能用 → 高分辨模型怎么对照 → 峰重叠怎么分解 → 时间分辨怎么精修 → 怎么用脚本批量做；流水线吃**管式/静态帧**。
-
-> **SEC 端到端流水线已迁出**：`run-a-sec-saxs-pipeline-end-to-end` 现在住在 [`AgentSkill-DoingSAXS`](https://github.com/flmaximwang/AgentSkill-DoingSAXS)
-> （与"判数据/归因"的 skill 同包，避免两处维护）。本仓库不再保留它的副本。
+**13 个 skill**：全是「决策点」skill（下面索引表）：配置是否就绪 → 一批帧怎么变成曲线 → 读出的 Rg 信不信得过 → SEC 洗脱里哪一段算一个样品 → 扣减后还在漂怎么办 → 强度怎么钉到绝对刻度 → 从 I(q) 到 P(r) 与 Dmax → 分子量该用哪一法 → 重建做完能不能用 → 高分辨模型怎么对照 → 峰重叠怎么分解 → 时间分辨怎么精修 → 怎么用脚本批量做。
+**两条端到端流水线都不在本仓库**（工程产物、非蒸馏），同住 [`AgentSkill-DoingSAXS`](https://github.com/flmaximwang/AgentSkill-DoingSAXS)：`run-a-sec-saxs-pipeline-end-to-end`（SEC 连续洗脱帧）与 `run-a-tube-saxs-pipeline-end-to-end`（管式/静态帧，**ATSAS 就绪后同时出电子云 DENSS 与珠模 DAMMIF×N + DAMAVER**）。
+```bash
+hermes skills install flmaximwang/AgentSkill-DoingSAXS/skills/run-a-tube-saxs-pipeline-end-to-end --category saxs -y
+```
 
 蒸馏流水线是 **cangjie-skill（book2skill）的 RIA-TV++**：整文理解 → 5 视角提取（三本共 **224 条候选**）→ 三重验证（V1 跨域 / V2 预测力 / V3 独特性）→ RIA++ 构造 → Zettelkasten 链接 → 压力测试（独立盲测）→ 人性化输出（学习笔记 + 话术库）。
 
@@ -35,7 +36,7 @@
 | [deconvolve-overlapping-elution-peaks](skills/deconvolve-overlapping-elution-peaks/SKILL.md) | 峰重叠按复杂度选 SVD / EFA / REGALS；分量数 → 区间 → λ 三阶调参 + χ² 与正性约束复核 | `references/deconvolution-workflow.md` |
 | [analyze-time-resolved-series](skills/analyze-time-resolved-series/SKILL.md) | 一批 series 一起精修：时间校准 → q 裁剪/rebin → 排除帧 → 帧合并；S/N 与测量次数判据 | `references/multi-series-workflow.md` |
 | [script-raw-with-the-python-api](skills/script-raw-with-the-python-api/SKILL.md) | 用 RAWAPI 批量/可复现地做同一件事（load → analyse → save 三段骨架 + 函数清单 + 对象访问） | `references/rawapi-function-inventory.md` |
-| [run-a-tube-saxs-pipeline-end-to-end](skills/run-a-tube-saxs-pipeline-end-to-end/SKILL.md) | **端到端跑一批管式/静态 SAXS 帧**（目录内样品 + 夹着它的 control，图像→报告，全程 RAW）：归一化开关（`ImageHdrFormat`/`EnableNormalization`）→ control 相对缩放（1–3% 高 q 残留用 `scaleRelative` 定标）→ 多区间 Guinier 闸门表（Rg 漂移/`chi2_red`/curvature/`qRg`）→ BIFT 跑两次 + 可信闸门（Dmax 会跑出搜索域）→ MW → DENSS（DAMMIF 需 ATSAS）→ 各节点 `.dat`/表/PDF/GUI workspace；**整批跑法**：3 并行 + `summarize-tube-run.py`（31 列汇总 + 稀释序列检查）+ `plot-tube-overview.py` | `references/tube-control-pairing-and-scaling.md`、`scripts/`（3 个可执行脚本） |
+| ~~run-a-tube-saxs-pipeline-end-to-end~~（**已迁出**） | 端到端跑一批管式/静态 SAXS 帧：归一化开关 → control 相对缩放 → 多区间 Guinier 闸门表 → BIFT + GNOM 的 P(r)（三条可信闸门）→ MW → **电子云（DENSS）+ 珠模（DAMMIF×N / DAMAVER）** → 每目录 `README.md`（含"最终拟合参数与误差怎么读"）；整批 + `summarize-tube-run.py` / `plot-tube-overview.py` | 新家：[`AgentSkill-DoingSAXS`](https://github.com/flmaximwang/AgentSkill-DoingSAXS) — `hermes skills install flmaximwang/AgentSkill-DoingSAXS/skills/run-a-tube-saxs-pipeline-end-to-end --category saxs -y` |
 
 给人看的文档：[第 1 本学习笔记](books/bioxtas-raw-manual/LEARNING_NOTE.md) · [SEC 本](books/sec-saxs-series/LEARNING_NOTE.md) · [官方文档本](books/bioxtas-raw-official-docs/LEARNING_NOTE.md)；
 话术库：[第 1 本](books/bioxtas-raw-manual/TALKING_POINTS.md) · [SEC 本](books/sec-saxs-series/TALKING_POINTS.md) · [官方文档本](books/bioxtas-raw-official-docs/TALKING_POINTS.md)。
@@ -54,7 +55,7 @@ skill 总览与引用图：[第 1 本](books/bioxtas-raw-manual/INDEX.md) · [SE
 | 5–6（子集校验） | 5–6 条 | 80% → **83%** | 80% → **83%** | 残留一条真歧义（"SEC 一千多帧怎么变成曲线"），代价为多一跳，已评估并停止调参 |
 | 7（官方文档卷） | **13 个 skill，26 条**（13 正面 + 13 诱饵） | **92%**（正面 13/13 · 诱饵 11/13） | **77%**（正面 12/13 · 诱饵 8/13） | 5 条错归因到"可见窗口缺排除条款" → 回炉改 3 个 description 窗口 + 金标修订 1 条；复测（10 条子集，2 位新评测者）**100% / 100%** |
 | 7b（复测子集） | 受影响 6 条 + 对照 4 条 | **100%** | **100%** | 折扣已记：此轮部分在考"是否读了排除条款"，真实难度基线取第 7 轮 |
-| 8（管式流水线） | 新增 `run-a-tube-saxs-pipeline-end-to-end`，16 个候选，12 条（管式正面 5 + 诱饵 7） | 6/12（金标修正后 **8/12**） | 5/12（修正后 **7/12**） | 一致错误 5 条：**2 条是金标定错**（判据题被本 skill 边界主动转走）、1 条真漏（多区间产物抢不到"拟合/范围/结论"三个词）、1 条 = 姐妹 skill 已记录的同一真歧义（"SEC 一千多帧"）、1 条 57 字窗口内不可达（归一化视频）。按第 5–6 轮的处置口径：记代价、不再调参 |
+| 8（管式流水线，**该 skill 已迁至 `AgentSkill-DoingSAXS`**） | 新增 `run-a-tube-saxs-pipeline-end-to-end`，16 个候选，12 条（管式正面 5 + 诱饵 7） | 6/12（金标修正后 **8/12**） | 5/12（修正后 **7/12**） | 一致错误 5 条：**2 条是金标定错**（判据题被本 skill 边界主动转走）、1 条真漏（多区间产物抢不到"拟合/范围/结论"三个词）、1 条 = 姐妹 skill 已记录的同一真歧义（"SEC 一千多帧"）、1 条 57 字窗口内不可达（归一化视频）。按第 5–6 轮的处置口径：记代价、不再调参 |
 
 细节（含判定口径的调整与理由、残留问题评估）见三本各自的 `test-results.md`。
 
@@ -70,11 +71,12 @@ for s in configure-bioxtas-raw-for-a-dataset reduce-saxs-frames-to-curves assess
 done
 ```
 
-## 端到端流水线（管式）：非蒸馏产物
+## 端到端流水线：已迁出，留实测凭据
 
-> **SEC 那条（`run-a-sec-saxs-pipeline-end-to-end`）已迁到 [`AgentSkill-DoingSAXS`](https://github.com/flmaximwang/AgentSkill-DoingSAXS)**：
-> `hermes skills install flmaximwang/AgentSkill-DoingSAXS/skills/run-a-sec-saxs-pipeline-end-to-end --category saxs -y`。
-> 下面留一份它的实测凭据（当时的踩坑记录对本仓库的判据 skill 仍有参照价值）。
+> **两条流水线都已迁到 [`AgentSkill-DoingSAXS`](https://github.com/flmaximwang/AgentSkill-DoingSAXS)**：
+> `hermes skills install flmaximwang/AgentSkill-DoingSAXS/skills/run-a-sec-saxs-pipeline-end-to-end --category saxs -y`
+> 与 `hermes skills install flmaximwang/AgentSkill-DoingSAXS/skills/run-a-tube-saxs-pipeline-end-to-end --category saxs -y`。
+> 下面留一份它们的实测凭据（当时的踩坑记录对本仓库的判据 skill 仍有参照价值）。
 
 `run-a-sec-saxs-pipeline-end-to-end` 不是从书里蒸出来的，是**按用户验收条件 + 真实数据实测**写出来的工程产物
 （2026-10-01 BL19U2 的 BSA SEC-SAXS 数据，2000 帧）。它的四个脚本，每一步都跑过真数据：
