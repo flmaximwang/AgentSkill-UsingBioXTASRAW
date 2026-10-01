@@ -1,0 +1,69 @@
+{
+  "skill": "reduce-saxs-frames-to-curves",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "线站刚下机，我手上有 20 张 tif，怎么把它们变成一条能用的曲线？",
+      "expected_behavior": "按 E 段走流水线：确认配置已加载（否则判停转 configure skill）→ 定位目录 → 文件类型过滤 TIF → 选帧 → Plot 积分 → Average（蛋白与缓冲液各一条）→ 隐藏单帧只留平均曲线检查 → 星标缓冲液后 Subtract → Save 得到 .dat（`*` 消失）。",
+      "notes": "正面场景：本 skill 的教科书式入口。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "Profiles 列表里文件名前面那个 * 是什么意思？我可以把这条 S_ 开头的曲线删掉了吗",
+      "expected_behavior": "用状态机回答：`*` = 有未保存改动，`*` 消失才代表已写盘；`S_` = 扣减后的净散射曲线（红色）。判断能否安全删除的唯一信号是 `*` 是否已消失；建议先 Save 成 .dat 再清理。",
+      "notes": "正面场景：交付前自检，本 skill 特有的机检信号。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "扣缓冲液的时候，是不是把两条平均曲线（蛋白和 buffer）拿出来，buffer 标星再按 Subtract？给单帧减行不行",
+      "expected_behavior": "确认做法正确，并补上'为什么'：扣减双方都应是代表曲线（单帧会把自身噪声带进结果）；角色由星标决定而不是文件名；扣完看是否出现红色 `S_` 曲线且小 q 不出现整段负值。",
+      "notes": "正面场景：用户已在做，需要确认与补齐判据。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我要把曲线交给 ATSAS，RAW 里该导出成什么格式？保存在哪里",
+      "expected_behavior": "说明 .dat 是 SAXS 曲线的标准格式；保存动作在 Profiles 列表的 Save 按钮、存到目标文件夹；完成判据是文件名前的 `*` 消失。顺带点明：曲线是交付物，2D 图像只是'能重做'的保险。",
+      "notes": "正面场景：落盘环节，属本 skill 的第 4 段。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "我这条曲线的 Rg 是 2.4 nm，能说明我的蛋白是什么状态吗？单体还是二聚体",
+      "expected_behavior": "走 assess-guinier-fit-quality 或直接说明 Rg 单个数字回答不了寡聚态/形状问题；必要时指出需要 IFT/GNOM 与分子量交叉（超出两篇覆盖）。",
+      "notes": "诱饵类型：SAXS 话题 + 已有曲线，但问题在分析层不在还原层。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "我的数据是 SEC-SAXS 的连续 frame，几百张，怎么处理？",
+      "expected_behavior": "明确边界：SEC-SAXS 在 Series 选项卡里看，处理逻辑不是批次平均；本 skill 不覆盖，应查官方文档/ATSAS 的 SEC 流程。",
+      "notes": "诱饵类型：同软件的 2D→1D 话题，但数据形态不同（明列为边界）。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "RAW 绘图面板那四个选项卡（Profiles/IFTs/Image/Series）分别看什么？",
+      "expected_behavior": "纯界面查询：按数据形态作答（或指向 reference 文件），不启动还原流水线。",
+      "notes": "诱饵类型：界面巡览属信息检索，已被阶段 1.5 判为不成 skill。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "20 帧平均完就够了吗？我看有几帧曲线明显飘，要不要把它们去掉？",
+      "expected_behavior": "留在本 skill：说明平均降噪也掩盖漂移（辐射损伤/流动不稳），'要不要剔帧'是作者未讨论的缺口；正确做法是隐藏单帧单独看平均曲线、逐帧比对，并把'平均了不一致的帧'作为结论告知用户，而不是默认全平均。",
+      "notes": "边界：处于'照做'与'需要判断'之间，考察是否把缺口讲成判断而不是规则。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我按流程扣减完了，曲线看着挺舒服，但下游说这条数据不能用。可能哪里漏了？",
+      "expected_behavior": "用状态机自检：没有 `S_` 前缀说明扣减没成功（星标角色给错）；`*` 还在说明没真正写盘；再看是否混入了坏帧；若曲线本身小 q 异常则提示帧的选取或配置问题（必要时转 configure skill）。",
+      "notes": "边界：故障归因，需要把两三条机制合起来用。"
+    }
+  ]
+}

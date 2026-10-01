@@ -1,0 +1,69 @@
+{
+  "skill": "assess-guinier-fit-quality",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "Guinier 窗口里 n_min 显示 11，这是什么意思？我应该把它调成多少",
+      "expected_behavior": "解释 n_min 是取点下界（等价于丢掉几个最低 q 点），RAW 自动选区跳过它们可能是对的（低 q 常被束流杂散/聚合污染）；给出调法——逐步下移看 Rg 是否变化，据敏感度判断低 q 脏不脏，并对照残差与 q_max·Rg ≈ 1.3 定上界。",
+      "notes": "正面场景：本 skill 的招牌问题。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "我读出来的 Rg 是 24 Å，文献里报的是 2.4 nm，是不是差了十倍？数据有问题吗",
+      "expected_behavior": "先用单位判据回答：Rg 的单位是 1/q，q 用 Å⁻¹ 则 Rg 用 Å，q 用 nm⁻¹ 则 Rg 用 nm——24 Å 与 2.4 nm 是同一个数；提示任何 Rg 报告都要带单位与 q 区间，再谈是否需要检查拟合。",
+      "notes": "正面场景：数量级差异的第一嫌疑是单位，不是数据。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我这条曲线参数面板里 q_max*Rg 到 1.6 了，这个拟合还能用吗？",
+      "expected_behavior": "答'不能'并给出理由：q_max·Rg ≈ 1.3 是球状单分散粒子的近似有效边界（本例 1.27），超过它 Guinier 近似不成立；正确动作是把 n_max 收到 q_max·Rg ≈ 1.3，同时看残差是否变好，冲突时优先保残差形态。",
+      "notes": "正面场景：取点上界判据。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "写报告要报 Rg，除了数值本身我还需要交代哪些参数？",
+      "expected_behavior": "给四件套：q 区间、n_min 与 n_max、q_max·Rg、单位（并强调 Rg 单位 = 1/q）；再补上稳定性说明（区间微调下 Rg 变化多少），若变化 >10–20% 则应报'不适合给单一 Rg'。",
+      "notes": "正面场景：报告规范，源自 p2-06 与判停规则。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "怎么把这批 tif 积分、平均、扣完缓冲液导出成 .dat？",
+      "expected_behavior": "走 reduce-saxs-frames-to-curves。",
+      "notes": "诱饵类型：同一条数据链的前一段，与本 skill 的拟合判读无关。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "帮我用贝叶斯方法估一下这个样品的分子量",
+      "expected_behavior": "说明超出覆盖范围：分子量测定要多法交叉（标样 I0 比对、绝对校准、Vc、Vp、Shape&Size、Bayesian），本文只列名称无流程；可指向官方文档/ATSAS，不要用本 skill 的 Rg 判据冒充。",
+      "notes": "诱饵类型：SAXS 分析话题，但属被淘汰的单元（无流程）。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "RAW 里怎么跑 GNOM / 做距离分布分析？",
+      "expected_behavior": "明确说明本文只给到外链，本 skill 不覆盖 IFT/GNOM；应参考官方文档与程序 docs 文件夹。",
+      "notes": "诱饵类型：高级分析，明列为边界。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "我的样品是无序蛋白（IDP），Rg 也是这么读吗？q_max*Rg 还能用到 1.3 吗",
+      "expected_behavior": "留在本 skill 并改判据：q_max·Rg ≈ 1.3 只对球状单分散粒子成立，原文写的是'像 lyz 这样的球状蛋白质'；IDP 不适用，等于本 skill 的取点经验界失效，应改用别的方法（如 Kratky/距离分布），Rg 报告须显著标注适用性。",
+      "notes": "边界：考察是否把经验值当定律（作者盲点）。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "残差图我看着还行，就是 Rg 在 2.3 和 2.5 nm 之间跳，我该报哪个？",
+      "expected_behavior": "不应替用户挑选'更接近文献'的那个；给判停规则：先看 Rg 对取点区间的敏感度，>10–20% 视为不稳定，此时结论应是'该曲线不适合给单一 Rg 值'，并建议做 IFT/距离分布；如仍要报，须带区间与所用 n_min/n_max。",
+      "notes": "边界：正是原文没有给、由蒸馏者补上的判停标准。"
+    }
+  ]
+}

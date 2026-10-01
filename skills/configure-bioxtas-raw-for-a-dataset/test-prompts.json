@@ -1,0 +1,69 @@
+{
+  "skill": "configure-bioxtas-raw-for-a-dataset",
+  "version": "0.1.0",
+  "test_cases": [
+    {
+      "id": "should-trigger-01",
+      "type": "should_trigger",
+      "prompt": "我把线站的数据拷回自己电脑，用 RAW 积分出来的 q 轴跟文献差了一个数量级，Rg 也完全对不上，是数据坏了吗？",
+      "expected_behavior": "不要接受'数据坏了'这个前提。先问清数据出身（哪天/哪台仪器/有没有对应的 .cfg），指出积分需要的定心与样品-探测器距离不在图像文件里，缺配置时程序不报错但结果全错；给出 File-Load Settings 的路径，并用当天标样（山嵛酸银一级峰 1.076 nm⁻¹）把配置核对成事实。",
+      "notes": "正面场景：结果的系统性偏移——本 skill 的核心触发。"
+    },
+    {
+      "id": "should-trigger-02",
+      "type": "should_trigger",
+      "prompt": "刚装上 RAW，我看教程说要先加载什么文件才能处理图像？那个 cfg 是什么东西",
+      "expected_behavior": "讲清 .cfg 内含四件事（定心、校准、掩膜、标度），说明为什么它不在图像里、为什么必须加载；给出 File → Load Settings… 或双击 .cfg 的加载路径。",
+      "notes": "正面场景：前置动作确认，用户还没开始做，正是拦在前面的时机。"
+    },
+    {
+      "id": "should-trigger-03",
+      "type": "should_trigger",
+      "prompt": "我今天换了一批另一天的数据，RAW 里的配置要不要重新导入一遍？不导入会怎样",
+      "expected_behavior": "回答'要'，并解释代价：配置与'实验当天/那台仪器'绑定而不与数据文件绑定，不重新加载不会报错，只会让 q 轴与掩膜沿用上一次的值；给出核对办法（标样峰位）。",
+      "notes": "正面场景：跨数据集切换，最常见的静默出错入口。"
+    },
+    {
+      "id": "should-trigger-04",
+      "type": "should_trigger",
+      "prompt": "我怀疑 beamstop 那块没遮掉，曲线在小 q 有个奇怪的包，怎么确认配置真的生效了？",
+      "expected_behavior": "把'掩膜是否生效'当可检查项：说明掩膜是把像素排除在积分之外（不是扣背景），给出检查路径（Image 选项卡看原始帧/掩膜、低 q 段不应出现异常突起或负值），并提醒配置正确性的总判据是标样峰位。",
+      "notes": "正面场景：用户拿现象来问配置是否生效。"
+    },
+    {
+      "id": "should-not-trigger-01",
+      "type": "should_not_trigger",
+      "prompt": "BioXTAS RAW 在哪儿下载？Windows 和 Mac 分别装哪个包？",
+      "expected_behavior": "纯信息查询：给 SourceForge 地址与平台支持情况（Windows/macOS/Debian 有预构建安装程序，其它 Linux 发行版要源码编译），不启动配置核对流程。",
+      "notes": "诱饵类型：同软件的安装类问题，但没有任何'几何是否正确'的判断需求。"
+    },
+    {
+      "id": "should-not-trigger-02",
+      "type": "should_not_trigger",
+      "prompt": "帮我把这批 tif 走一遍：积分、平均、把缓冲液扣掉，最后导出 .dat",
+      "expected_behavior": "走 reduce-saxs-frames-to-curves 的流水线（其第 1 步才确认配置）。",
+      "notes": "诱饵类型：还原操作请求；配置只是那条流水线的一个检查点。"
+    },
+    {
+      "id": "should-not-trigger-03",
+      "type": "should_not_trigger",
+      "prompt": "我的 Guinier 窗口里 n_min 显示 11，我应该调成多少？",
+      "expected_behavior": "走 assess-guinier-fit-quality：解释 n_min 是取点下界并给出调法与判据。",
+      "notes": "诱饵类型：邻近主题（Guinier），但不涉及会话配置。"
+    },
+    {
+      "id": "edge-01",
+      "type": "edge_case",
+      "prompt": "RAW 打开文件夹以后里面是空的，看不到我的 tif，是不是软件坏了？",
+      "expected_behavior": "判定为界面/过滤问题排查（文件类型过滤器是否设成 TIF、目录是否选对），不属于配置确证；不要启动 cfg 流程，也不要展开成整条还原流水线。",
+      "notes": "边界：同在'动手之前'的窗口期，但对象是文件可见性而不是几何正确性。"
+    },
+    {
+      "id": "edge-02",
+      "type": "edge_case",
+      "prompt": "我这批数据是实验室自己的小角仪采的，没有标样，也没有 cfg，还能处理吗？",
+      "expected_behavior": "留在本 skill：这说明'没有可核对的锚点'，正确回答是可以用默认/自建几何做相对比较，但必须明确告知 q 轴绝对值未经验证，并指出从零标定超出本文范围（联系仪器负责人/参考官方文档）。",
+      "notes": "边界：数据来源脱离线站，正是作者盲点暴露处——答'不能'或'随便处理'都不对。"
+    }
+  ]
+}
