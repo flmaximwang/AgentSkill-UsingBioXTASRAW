@@ -1,6 +1,6 @@
 ---
 name: reduce-saxs-frames-to-curves
-description: "把一批 2D 探测器帧（tif/cbf）还原成一条可交付的 1D SAXS 曲线：积分 → 逐帧平均 → 扣减缓冲液 → 存 .dat。用 A_ / S_ / 颜色 / * 四个信号自检流水线走到哪一步。只覆盖常数条件的批次平均；SEC-SAXS、IFT/GNOM、Shape&Size 与 3D 重建不在此范围。"
+description: "把 SAXS 帧还原成 1D 曲线（积分→平均→扣减→存 .dat），A_/S_/* 自检进度；SEC-SAXS 不覆盖。用于「这批 tif 怎么变成一条曲线」「交给 ATSAS 导出什么格式」「文件名前的 * 和 S_ 是什么意思、能不能删」「扣减完下游说不能用」；不负责从曲线读 Rg。"
 source_book: 《BioXTAS RAW程序使用说明》· 刘广峰（公众号「生物小角」）· 2024-04-26
 source_chapter: §4 数据预处理（①–⑩）+ §2 界面
 tags: [saxs, bioxtas-raw, reduction, averaging, buffer-subtraction, bl19u2]
@@ -131,6 +131,7 @@ related_skills:
 - **不加载配置就积分**（`p4/ce01`）：程序不报错，曲线全错。见本 skill 第 1 步的判停点。
 - **不隐藏单帧**（`p4/ce03`）：平均曲线被埋在曲线丛里，异常看不见。
 - **不保存就清理**（`p4/ce04`）：未保存的曲线只活在当前会话里；判断能否安全删除的唯一信号是 `*` 是否已消失。
+- **流程走完但结果被下游拒**（盲测暴露的边界）：若"扣减完了、曲线看着还行，但下游说不能用"，**先用本 skill 的状态机自检**（有没有 `S_` 前缀 = 扣减是否成功、`*` 是否消失 = 有没有真的写盘、是否混入坏帧），**不要先跳到配置排查**；只有自检全过、曲线本身仍异常时，才回 `configure-bioxtas-raw-for-a-dataset` 查几何。
 - 另一个容易踩的坑（跨 skill）：Subtract 的**角色由星标决定**，不是由文件名决定（术语 `g06`、`g07`）。
 
 **作者盲点（阶段 0 批判第 4、5 条）**

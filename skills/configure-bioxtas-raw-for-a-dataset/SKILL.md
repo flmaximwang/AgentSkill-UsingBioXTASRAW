@@ -1,6 +1,6 @@
 ---
 name: configure-bioxtas-raw-for-a-dataset
-description: "处理 SAXS 图像前先核对该会话已加载当天的 .cfg（定心/样品-探测器距离/掩膜/标样），否则积分不报错但 q 轴与 Rg 全错。给出 RAW 的 Load Settings 路径 + 用山嵛酸银一级峰（1.076 nm⁻¹）把'配置对不对'变成可检验事实的核对法。不教从零标定一台陌生仪器，不覆盖 GNOM/IFT/Shape&Size 等高级分析。"
+description: "处理 SAXS 图像前先核对该会话已加载当天的 .cfg（定心/样品-探测器距离/掩膜/标样），否则积分不报错但 q 轴与 Rg 全错。给出 RAW 的 Load Settings 路径 + 用山嵛酸银一级峰（1.076 nm⁻¹）把'配置对不对'变成可检验事实的核对法；换实验日/换仪器、q 轴差一个数量级、怀疑掩膜没生效时用它。不教从零标定一台陌生仪器，不覆盖 GNOM/IFT/Shape&Size，也不负责流水线自检与 Rg 判读。"
 source_book: 《BioXTAS RAW程序使用说明》· 刘广峰（公众号「生物小角」）· 2024-04-26
 source_chapter: §3 RAW 程序配置文件
 tags: [saxs, bioxtas-raw, configuration, calibration, silent-failure, bl19u2]
