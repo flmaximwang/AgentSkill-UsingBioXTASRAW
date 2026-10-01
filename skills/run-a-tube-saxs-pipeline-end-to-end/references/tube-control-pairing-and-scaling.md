@@ -20,7 +20,13 @@ A5-05-2_0015 → … → ddh2o_0022 → A5-05-6_0023`。即：**每组样品用�
 判别法：`.txt` 里的 `Description` 字段 + run 号顺序。
 
 脚本默认规则：目录名 = 样品前缀 → 同前缀帧是样品，其余全是 control；多前缀时 `--control-key ddh2o,pb7`。
-一个目录里 60 帧通常是 3 个 run × 20 帧（control + 样品 + control）。
+一个目录里 60 帧通常是 3 个 run × 20 帧（control + 样品 + control）；`A5-05-6` 这类首尾样品只有一侧背景（40 帧 = 2 run）。
+
+**两条来自上游 `organize-batch-saxs-dataset` 的判据，别自己发明**：
+
+- 样品身份取**帧 1 的 `Description` 字段**，不是文件名前缀的子串——`877-apo-pb7` 是"在 pb7 里测的 877-apo 样品"，
+  用子串判背景会把整个样品判成背景。
+- 背景身份 = `Description` **精确等于**用户点名的背景名（典型 `pb7` / `ddh2o`）；目录还没归类时先跑那个 skill 拆目录。
 
 ## 2. 归一化：RAW 会读逐帧 txt，但 cfg 里两个开关是关着的
 

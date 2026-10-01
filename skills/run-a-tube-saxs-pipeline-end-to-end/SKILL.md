@@ -23,6 +23,8 @@ metadata:
         relation: composes-with
       - slug: run-a-sec-saxs-pipeline-end-to-end
         relation: sibling
+      - slug: organize-batch-saxs-dataset
+        relation: composes-with
 ---
 
 # 端到端跑一批管式/静态 SAXS 帧（全程 RAW）
@@ -59,7 +61,9 @@ MW 方法选择 → `choose-a-molecular-weight-method`；重建结果评估 → 
 | `BSA` | `pb7_0001` + `BSA_0002` + `pb7_0003` | **pb7** |
 | `5705` / `97df` / `877-*-pb7` | `pb7_00XX` 夹着样品 | **pb7** |
 
-所以脚本的默认规则是"**文件名前缀 = 样品名（默认取目录名）的是样品，其余都是 control**"；前缀不一致时用 `--sample-key` / `--control-key` 手工指定。
+所以脚本的默认规则是"**文件名前缀 = 样品名（默认取目录名）的是样品，其余都是 control**"（前缀**精确相等**，不做子串匹配——
+`877-apo-pb7` 里的 "pb7" 是缓冲液后缀，不是背景）；前缀不一致时用 `--sample-key` / `--control-key` 手工指定。
+目录还没归类（一堆 series 平铺在一个目录里）时，先走 `organize-batch-saxs-dataset` 拆成"每样品一个文件夹 + 夹着它的背景"。
 
 ## 核心机制（四条，都是实测撞出来的）
 
@@ -157,6 +161,7 @@ python run-raw-tube-pipeline.py --sample-dir <目录> --cfg <日期>.cfg --out-d
 
 ## 相关 skills
 
+- **organize-batch-saxs-dataset** — 上游第 0 步：把平铺的下机 batch 拆成"每样品一个文件夹 + 前后背景"（样品身份取帧 1 的 `Description`，不靠文件名子串猜）。
 - **run-a-sec-saxs-pipeline-end-to-end** — 姐妹 skill：SEC 连续洗脱帧走那条（差别在 control 来自 series 的峰前帧、要补逐帧 txt、要归一化视频）。
 - **reduce-saxs-frames-to-curves** — 单点版本：帧→曲线这一步的判据（`A_`/`S_`/`*` 自检信号、CorMap 相似性）。
 - **assess-guinier-fit-quality** — 本 skill 表的读法：q·Rg 上下界、残差形态、Kratky 交叉验证。
