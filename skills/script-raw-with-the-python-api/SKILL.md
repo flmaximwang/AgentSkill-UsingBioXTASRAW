@@ -206,6 +206,13 @@ raw.save_profile(prof, 'x.dat', './out')                     # ③ save
 - **版本**：绑定 RAW **2.4.2**；`pip install .` 会生成 `bioxtas_raw` 命令。官方 API 文档以 latest 为准，函数可能随版本增删。
 - **`getQ()` vs 原始数据**：混用会长度不匹配（见 I 段）。
 
+**并发模型（v2.4.2 源级；本机实测）**
+
+- 判据：**别指望 `nprocs` 加速 Series 的平均/扣减——它默认 1，串行是设计**；要并行只有走下面点名的少数入口。
+- 源级事实：主窗口所有 Series 操作（`to_plot_series → _plotSeries → _sendSECMToPlot`）都排在唯一的 `MainWorkerThread`（`RAW.py:4371`）命令队列里、**串行**执行；SASCalc 的 numba 内核**全部** `parallel=False`；设置项 `'nprocs'` 默认 **1**（`RAW.py:463`）；平均/扣减是普通 Python + numpy（`SASProc.average:102`、`SECM.averageFrames:1433`），**没有 pool**。
+- 真正的多核只在这几处：Multi-Series 工具（`RAWMultiSeriesAnalysis.py:1130-1136`，Pool 上限 `min(cpu, 3)`）、批量图像积分（`RAWAnalysis.py:9169/9443`）、Number of simultaneous runs（`RAWAnalysis.py:13720/13815-13819`）、`BIFT.py`、`DENSS.py`（唯一的 `njit parallel=True`）。
+- 含义：写脚本时对"一条 series 的平均/扣减"做好**串行、按预期慢**的准备——那不是没配好，是 RAW 的设计。要并行就去用 Multi-Series 工具、批量图像积分或 simultaneous runs，而不是去调 `nprocs`。
+
 **参考文件**：按类别分组的函数名 + 一句话 + 返回元组（标"来自 examples"）见 `references/rawapi-function-inventory.md`。对象与术语（SAM/IFTM/SECM/profile_type）见该文件，以及 `../configure-bioxtas-raw-for-a-dataset/references/bioxtas-raw-glossary.md`。
 
 ## 相关 skills

@@ -125,10 +125,37 @@ SAXS 还原里最贵的一类错误是**沉默的错误**——RAW 不会因为"
 
 **不要用的场景**
 
-- 用户只是问"RAW 是什么／在哪下载／怎么装"——那是信息查询。安装一律优先用 SourceForge 上的预构建安装程序（Windows/macOS/Debian），没有对应版本才回源码编译；这条不构成 skill。
+- 用户只是问"RAW 是什么／在哪下载／怎么装"——那是信息查询。官方推荐从 SourceForge 下预构建安装程序（Windows/macOS/Debian）；**本机该路由已实测不可用，替代装法见下面「本机环境与安装（实测）」**。这条不构成 skill。
 - 用户要的是**从零标定**一台陌生仪器／自建台——原文把这件事交给线站工作人员（"如有其他设置问题，请联系线站工作人员"），本 skill 不越界提供标定教程。
 - 用户手上已经是 `.dat` 曲线（没有 2D 帧）：配置这一步没有操作对象，直接去 Guinier skill。
 - 用户问 GNOM / IFT / Shape&Size / Bayesian MW / 3D 重建——本文只列了名称，本 skill 一概不覆盖。
+
+**本机环境与安装（实测，2026-10-01）**
+
+- 判据（动手前先跑这三条）：
+
+  ```bash
+  # ① 本机唯一可用的 RAW 解释器（RAW 2.4.2；含 pyFAI/numba/matplotlib，DENSS 随包内置）
+  /Applications/BioXTASRAW/bin/python -c "import bioxtasraw; print(bioxtasraw.__version__)"
+  # ② 别在 RAW 源码目录里跑：源码树里有个同名的 sascalc_exts，在这一层启动会把它遮蔽
+  pwd   # 若输出是 bioxtasraw 源码根 → 先 cd 出去再跑
+  # ③ 数据集布局
+  # <项目>/data/<模式>/<样品>/        ← 原始帧
+  # <项目>/processed/<模式>/<样品>/   ← 结果
+  ```
+
+- **解释器**：旧的 `uv venv ~/.venvs/raw` 已删；一律用 mamba 环境 `/Applications/BioXTASRAW/bin/python`。实测版本 RAW **2.4.2**，pyFAI / numba / matplotlib 齐备，DENSS 随之内置。
+- **不要在 RAW 源码目录里跑**：源码树那一层有个同名的 `sascalc_exts`，在源码根启动 Python 时会把它遮蔽（导入到源码内那份、而不是装好的那版），行为与安装版不一致。
+- **安装**：官方预构建 dmg（SourceForge）在本机**已实测不可用**——`downloads.sourceforge.net` 直连与走 TUN 代理都失败（CF 522 或 TCP 挂死 20s+），10+ 镜像逐个探活全灭，第三方出口（codetabs 代理）也 522 → 属 SourceForge 侧故障，不是用户网络。同机 `github.com` / `codeload.github.com` / `raw.githubusercontent.com` / `pypi.org` / `conda.anaconda.org` 均正常。替代装法 = **GitHub 源码 + PyPI 的 wxpython 轮子**：
+
+  ```bash
+  git clone --branch v2.4.2 --depth 1 https://github.com/jbhopkins/bioxtasraw.git && cd bioxtasraw
+  /Applications/BioXTASRAW/bin/python -m pip install wxpython   # 轮子走 PyPI
+  /Applications/BioXTASRAW/bin/python -m pip install .
+  ```
+
+- **数据集布局**：`<项目>/data/<模式>/<样品>/` 放原始帧，`<项目>/processed/<模式>/<样品>/` 放结果；同一项目下 Tube-SAXS 与 SEC-SAXS 两套并行（实例 `DataProcess_2026.10.01`）。产物在每套 `<样品>/` 下再分 profiles/tables/ifts/models 等子目录（契约见 `run-a-sec-saxs-pipeline-end-to-end` / `write-saxs-results-readme`）。
+- **管式实战（对照/背景按样品名精确匹配）**：`A5-05-1..6` 是 2 倍稀释序列（I0 64→2.3，Vc-MW 恒定 18.5–20.9 kDa）；`A5-05-x` 的 control=`ddh2o`，而 `BSA` / `5705` / `877` / `97df` 的 control=`pb7`（那批 Rg 51–158 Å，是聚集体——不是可用的单体信号）。
 
 **作者警告过的失败模式**
 
